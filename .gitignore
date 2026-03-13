@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+
+# Git worktrees
+.worktrees/
+
+# Plans & design docs (not for commit)
+docs/plans/
+
+# OS files
+.DS_Store
+
+# Editor
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Environment
+.env
+.env.*
+!.env.example

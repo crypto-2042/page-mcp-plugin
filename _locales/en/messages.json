@@ -1,0 +1,415 @@
+{
+    "extensionName": {
+        "message": "Page MCP — AI Assistant"
+    },
+    "extensionDesc": {
+        "message": "AI assistant that auto-discovers page MCP tools, resources, and skills. Chat with any MCP-enabled page."
+    },
+    "searchPlaceholder": {
+        "message": "Search MCP or Skills..."
+    },
+    "prompts": {
+        "message": "Prompts"
+    },
+    "tools": {
+        "message": "Tools"
+    },
+    "resources": {
+        "message": "Resources"
+    },
+    "skills": {
+        "message": "Skills"
+    },
+    "noItems": {
+        "message": "No data on this page"
+    },
+    "viewAll": {
+        "message": "View all $num$ items",
+        "placeholders": {
+            "num": {
+                "content": "$1"
+            }
+        }
+    },
+    "viewLess": {
+        "message": "View less"
+    },
+    "generalTitle": {
+        "message": "General Settings"
+    },
+    "generalDesc": {
+        "message": "Configure basic plugin behaviors."
+    },
+    "languageLabel": {
+        "message": "Console Language"
+    },
+    "autoDetectTitle": {
+        "message": "Auto Detect & Mount"
+    },
+    "autoDetectDesc": {
+        "message": "Scan webpage MCP metadata automatically."
+    },
+    "alwaysInjectTitle": {
+        "message": "Always Inject Chat Widget"
+    },
+    "alwaysInjectDesc": {
+        "message": "Show the chat bubble on every site, even if no MCP host is found."
+    },
+    "injectResourcesTitle": {
+        "message": "Inject Chat On Resources"
+    },
+    "injectResourcesDesc": {
+        "message": "Show the chat bubble if a page provides tools or prompts via JSON-LD or meta tags."
+    },
+    "overrideChatTitle": {
+        "message": "Override Page's Native Chat"
+    },
+    "overrideChatDesc": {
+        "message": "Replace the website's native chat window with Page MCP if available."
+    },
+    "overrideSitesTitle": {
+        "message": "Enable Override On:"
+    },
+    "siteEmpty": {
+        "message": "(Empty list)"
+    },
+    "addSiteBtn": {
+        "message": "Add Domain"
+    },
+    "apiSettingsTitle": {
+        "message": "API Settings"
+    },
+    "apiSettingsDesc": {
+        "message": "Configure your AI model endpoint and credentials."
+    },
+    "apiKeyTitle": {
+        "message": "API Key"
+    },
+    "apiKeyDesc": {
+        "message": "Enter your authentication key to access AI models."
+    },
+    "apiKeyHint": {
+        "message": "Stored locally and safely."
+    },
+    "baseUrlTitle": {
+        "message": "API Base URL"
+    },
+    "baseUrlDesc": {
+        "message": "The API base URL for the model service."
+    },
+    "modelTitle": {
+        "message": "Selected Model"
+    },
+    "modelDesc": {
+        "message": "Select the AI model to use. Models are auto-fetched after setting API Key and Base URL."
+    },
+    "modelPlaceholder": {
+        "message": "--Select Model--"
+    },
+    "uiConfigTitle": {
+        "message": "UI Configuration"
+    },
+    "uiConfigDesc": {
+        "message": "Customize the appearance of the widget."
+    },
+    "themeTitle": {
+        "message": "Theme Mode"
+    },
+    "themeSystem": {
+        "message": "Auto (System)"
+    },
+    "themeLight": {
+        "message": "Light Day"
+    },
+    "themeDark": {
+        "message": "Dark Night"
+    },
+    "accentTitle": {
+        "message": "Accent Color"
+    },
+    "posTitle": {
+        "message": "Widget Position"
+    },
+    "posBotRight": {
+        "message": "↘ Bottom Right"
+    },
+    "posBotLeft": {
+        "message": "↙ Bottom Left"
+    },
+    "posTopRight": {
+        "message": "↗ Top Right"
+    },
+    "posTopLeft": {
+        "message": "↖ Top Left"
+    },
+    "securityTitle": {
+        "message": "Privacy Security"
+    },
+    "securityDesc": {
+        "message": "Manage sensitive data lifecycle."
+    },
+    "dataStorageTitle": {
+        "message": "Storage Management"
+    },
+    "navBasic": {
+        "message": "Basic"
+    },
+    "navApi": {
+        "message": "API & Interface"
+    },
+    "navSecurity": {
+        "message": "Security"
+    },
+    "actionBarText": {
+        "message": "Unsaved changes pending!"
+    },
+    "discardBtn": {
+        "message": "Discard Options"
+    },
+    "saveBtn": {
+        "message": "Save & Apply"
+    },
+    "toastSaved": {
+        "message": "✓ Saved"
+    },
+    "toastSaveFail": {
+        "message": "✗ Error: "
+    },
+    "toastDiscarded": {
+        "message": "Changes discarded"
+    },
+    "toastInvalidHost": {
+        "message": "Invalid host"
+    },
+    "toastDupSite": {
+        "message": "Duplicate domain"
+    },
+    "modelFetchNoKey": {
+        "message": "API key is missing"
+    },
+    "modelFetching": {
+        "message": "Fetching..."
+    },
+    "modelFetched": {
+        "message": "Successfully fetched {n} models"
+    },
+    "modelFetchFail": {
+        "message": "Failed to fetch: {e}"
+    },
+    "testNoKey": {
+        "message": "No API Key to test"
+    },
+    "testTesting": {
+        "message": "Testing connection..."
+    },
+    "testSuccess": {
+        "message": "Connection successful"
+    },
+    "navGeneral": {
+        "message": "General"
+    },
+    "navModel": {
+        "message": "Model API"
+    },
+    "navInterface": {
+        "message": "Interface"
+    },
+    "navOther": {
+        "message": "Other"
+    },
+    "overrideTitle": {
+        "message": "Override Host Domains"
+    },
+    "overrideDesc": {
+        "message": "Force take over on below domains."
+    },
+    "sitePlaceholder": {
+        "message": "e.g. *.openai.com"
+    },
+    "addBtn": {
+        "message": "Add Mapping"
+    },
+    "modelTabTitle": {
+        "message": "Language Model API"
+    },
+    "modelTabDesc": {
+        "message": "Define your intelligence provider."
+    },
+    "modelManualConfirm": {
+        "message": "Apply custom"
+    },
+    "testBtn": {
+        "message": "Test Connection"
+    },
+    "interfaceTitle": {
+        "message": "Immersive Interface"
+    },
+    "interfaceDesc": {
+        "message": "Adjust plugin colors and glassmorphism depths."
+    },
+    "themeAuto": {
+        "message": "Follow System"
+    },
+    "autoClearTitle": {
+        "message": "Incognito Auto-Clear"
+    },
+    "autoClearDesc": {
+        "message": "Clear contexts after closing tab."
+    },
+    "clearAllTitle": {
+        "message": "Danger Zone: Erase All"
+    },
+    "clearAllDesc": {
+        "message": "Clear every single api key and setting."
+    },
+    "toastClearConfirm": {
+        "message": "Erase all plugin settings? Are you sure?"
+    },
+    "toastCleared": {
+        "message": "Settings cleared"
+    },
+    "clearAllBtn": {
+        "message": "Wipe Everything"
+    },
+    "otherTitle": {
+        "message": "Other Utilities"
+    },
+    "otherDesc": {
+        "message": "Misc extension settings."
+    },
+    "resetTitle": {
+        "message": "Soft Reset"
+    },
+    "resetDesc": {
+        "message": "Reset form values."
+    },
+    "toastResetConfirm": {
+        "message": "Are you sure you want to reset this page?"
+    },
+    "resetBtn": {
+        "message": "Reset Options"
+    },
+    "encryptTitle": {
+        "message": "Local Storage Encryption"
+    },
+    "encryptDesc": {
+        "message": "Encrypt chat history and settings saved locally."
+    },
+    "permissionTitle": {
+        "message": "Permission Control"
+    },
+    "confirmToolTitle": {
+        "message": "Confirm Tool Calls"
+    },
+    "confirmToolDesc": {
+        "message": "Require manual confirmation before AI calls page tools."
+    },
+    "filterTitle": {
+        "message": "Filter Sensitive Data"
+    },
+    "filterDesc": {
+        "message": "Automatically filter out sensitive information on page."
+    },
+    "aboutTitle": {
+        "message": "About Page MCP"
+    },
+    "aboutVersion": {
+        "message": "Version"
+    },
+    "aboutAuthor": {
+        "message": "Author"
+    },
+    "aboutLicense": {
+        "message": "License"
+    },
+    "aboutHomepage": {
+        "message": "Homepage"
+    },
+    "overrideDetected": {
+        "message": "Native Chat Detected:"
+    },
+    "overrideBtn": {
+        "message": "Override"
+    },
+    "toastReset": {
+        "message": "Settings reset to defaults"
+    },
+    "navRemoteServices": {
+        "message": "MCP/Skills"
+    },
+    "remoteServicesTitle": {
+        "message": "MCP/Skills"
+    },
+    "remoteServicesDesc": {
+        "message": "Manage isolated MCP/Skills repositories created in options."
+    },
+    "remoteSearchTitle": {
+        "message": "Search MCP/Skills Repositories"
+    },
+    "remoteSearchDesc": {
+        "message": "Filter by repository name or site domain."
+    },
+    "remoteSearchPlaceholder": {
+        "message": "Search by repository name or domain"
+    },
+    "remoteLoading": {
+        "message": "Loading MCP/Skills repositories..."
+    },
+    "remoteEmpty": {
+        "message": "No MCP/Skills repositories yet."
+    },
+    "remoteDomain": {
+        "message": "Domain"
+    },
+    "remoteVersion": {
+        "message": "Version"
+    },
+    "remoteMarket": {
+        "message": "Market"
+    },
+    "remoteViewDetail": {
+        "message": "Detail"
+    },
+    "remoteDelete": {
+        "message": "Delete"
+    },
+    "remoteLoadingSwitchTitle": {
+        "message": "Enable Remote Loading"
+    },
+    "remoteLoadingSwitchDesc": {
+        "message": "Load remote MCP/Skills from installed repositories on demand when opening pages."
+    },
+    "marketWhitelistTitle": {
+        "message": "Market Origin Whitelist"
+    },
+    "marketWhitelistDesc": {
+        "message": "Only these market origins can trigger install writes."
+    },
+    "marketWhitelistEmpty": {
+        "message": "No whitelisted origins yet."
+    },
+    "marketWhitelistPlaceholder": {
+        "message": "e.g. http://localhost:5173"
+    },
+    "testTitle": {
+        "message": "AI Model Connectivity Test"
+    },
+    "testDesc": {
+        "message": "Verify current model endpoint connectivity."
+    },
+    "remoteDeleteConfirm": {
+        "message": "Are you sure you want to delete this remote repository?"
+    },
+    "remoteDeleteDialogTitle": {
+        "message": "Delete Remote Repository"
+    },
+    "remoteDeleteDialogDesc": {
+        "message": "Are you sure you want to delete {name}?"
+    },
+    "remoteDeleteCancel": {
+        "message": "Cancel"
+    },
+    "remoteDeleteConfirmBtn": {
+        "message": "Delete"
+    }
+}

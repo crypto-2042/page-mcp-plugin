@@ -1,0 +1,415 @@
+{
+    "extensionName": {
+        "message": "Page MCP — AI助手"
+    },
+    "extensionDesc": {
+        "message": "自动发现页面MCP工具、资源和技能的AI助手。与任何支持MCP的页面聊天。"
+    },
+    "searchPlaceholder": {
+        "message": "搜索 MCP 或 Skills..."
+    },
+    "prompts": {
+        "message": "提示词 (Prompts)"
+    },
+    "tools": {
+        "message": "工具 (Tools)"
+    },
+    "resources": {
+        "message": "资源 (Resources)"
+    },
+    "skills": {
+        "message": "技能 (Skills)"
+    },
+    "noItems": {
+        "message": "此页面没有发现可用数据"
+    },
+    "viewAll": {
+        "message": "查看全部 $num$ 项",
+        "placeholders": {
+            "num": {
+                "content": "$1"
+            }
+        }
+    },
+    "viewLess": {
+        "message": "收起部分"
+    },
+    "generalTitle": {
+        "message": "通用设置"
+    },
+    "generalDesc": {
+        "message": "配置插件的基础行为。"
+    },
+    "languageLabel": {
+        "message": "控制台界面语言"
+    },
+    "autoDetectTitle": {
+        "message": "自动检测并挂载"
+    },
+    "autoDetectDesc": {
+        "message": "自动扫描提取网页的 MCP 元数据。"
+    },
+    "alwaysInjectTitle": {
+        "message": "默认驻留模式"
+    },
+    "alwaysInjectDesc": {
+        "message": "即使未检测到任何 MCP，也强制注入对话助手。"
+    },
+    "injectResourcesTitle": {
+        "message": "资源驱动模式"
+    },
+    "injectResourcesDesc": {
+        "message": "如果页面提供了静态的工具定义（例如通过 JSON-LD），就自动启用对话。"
+    },
+    "overrideChatTitle": {
+        "message": "接管原生对话窗口"
+    },
+    "overrideChatDesc": {
+        "message": "如果网站本身提供了 @page-mcp/chat，用当前插件界面将其覆盖。"
+    },
+    "overrideSitesTitle": {
+        "message": "启用接管的域名："
+    },
+    "siteEmpty": {
+        "message": "(空)"
+    },
+    "addSiteBtn": {
+        "message": "添加域名"
+    },
+    "apiSettingsTitle": {
+        "message": "模型与 API 设置"
+    },
+    "apiSettingsDesc": {
+        "message": "在这里配置你需要使用的大语言模型作为你的智能大脑。"
+    },
+    "apiKeyTitle": {
+        "message": "API 密钥"
+    },
+    "apiKeyDesc": {
+        "message": "输入你的身份验证密钥以访问 AI 模型。"
+    },
+    "apiKeyHint": {
+        "message": "密钥保存在本地缓存，极度安全。"
+    },
+    "baseUrlTitle": {
+        "message": "API 请求源 (Base URL)"
+    },
+    "baseUrlDesc": {
+        "message": "模型服务的 API 基础地址。"
+    },
+    "modelTitle": {
+        "message": "使用的模型 (Model)"
+    },
+    "modelDesc": {
+        "message": "选择要使用的 AI 模型。设置 API Key 和 Base URL 后可自动获取模型列表。"
+    },
+    "modelPlaceholder": {
+        "message": "--请选择智能体--"
+    },
+    "uiConfigTitle": {
+        "message": "界面与个性化"
+    },
+    "uiConfigDesc": {
+        "message": "选择适合你的对话框外观。"
+    },
+    "themeTitle": {
+        "message": "明暗适配模式"
+    },
+    "themeSystem": {
+        "message": "跟随系统"
+    },
+    "themeLight": {
+        "message": "纯白系日间"
+    },
+    "themeDark": {
+        "message": "暗黑系夜晚"
+    },
+    "accentTitle": {
+        "message": "点缀主色调"
+    },
+    "posTitle": {
+        "message": "悬浮球位置"
+    },
+    "posBotRight": {
+        "message": "↘ 右下"
+    },
+    "posBotLeft": {
+        "message": "↙ 左下"
+    },
+    "posTopRight": {
+        "message": "↗ 右上"
+    },
+    "posTopLeft": {
+        "message": "↖ 左上"
+    },
+    "securityTitle": {
+        "message": "隐私安全"
+    },
+    "securityDesc": {
+        "message": "掌握对敏感数据的生命周期控制。"
+    },
+    "dataStorageTitle": {
+        "message": "存储缓存管理"
+    },
+    "navBasic": {
+        "message": "基础"
+    },
+    "navApi": {
+        "message": "API与界面"
+    },
+    "navSecurity": {
+        "message": "数据安全"
+    },
+    "actionBarText": {
+        "message": "有尚未保存的变更！"
+    },
+    "discardBtn": {
+        "message": "撤销改动"
+    },
+    "saveBtn": {
+        "message": "保存并应用"
+    },
+    "toastSaved": {
+        "message": "✓ 设置已保存"
+    },
+    "toastSaveFail": {
+        "message": "✗ 保存失败: "
+    },
+    "toastDiscarded": {
+        "message": "已放弃修改"
+    },
+    "toastInvalidHost": {
+        "message": "无效的域名指纹"
+    },
+    "toastDupSite": {
+        "message": "域名已存在"
+    },
+    "modelFetchNoKey": {
+        "message": "缺少 API Key"
+    },
+    "modelFetching": {
+        "message": "获取中..."
+    },
+    "modelFetched": {
+        "message": "成功获取 {n} 个模型"
+    },
+    "modelFetchFail": {
+        "message": "加载模型失败: {e}"
+    },
+    "testNoKey": {
+        "message": "无 API Key, 无法测试"
+    },
+    "testTesting": {
+        "message": "测试连接中..."
+    },
+    "testSuccess": {
+        "message": "连接成功"
+    },
+    "navGeneral": {
+        "message": "通用设置"
+    },
+    "navModel": {
+        "message": "模型 API"
+    },
+    "navInterface": {
+        "message": "界面定制"
+    },
+    "navOther": {
+        "message": "其他设定"
+    },
+    "overrideTitle": {
+        "message": "手动启用强接管域名"
+    },
+    "overrideDesc": {
+        "message": "在这些域名上也会强行接管原生界面。"
+    },
+    "sitePlaceholder": {
+        "message": "例如: *.openai.com"
+    },
+    "addBtn": {
+        "message": "添加配置"
+    },
+    "modelTabTitle": {
+        "message": "大语言模型 API"
+    },
+    "modelTabDesc": {
+        "message": "调整你需要的人工智能供应商。"
+    },
+    "modelManualConfirm": {
+        "message": "应用自定义名称"
+    },
+    "testBtn": {
+        "message": "检测通信状态"
+    },
+    "interfaceTitle": {
+        "message": "沉浸式界面构建"
+    },
+    "interfaceDesc": {
+        "message": "调节插件色彩及玻璃态感知深度。"
+    },
+    "themeAuto": {
+        "message": "跟随操作系统"
+    },
+    "autoClearTitle": {
+        "message": "隐身免留痕(退出自动清数据)"
+    },
+    "autoClearDesc": {
+        "message": "会在网页关闭后清空上下文。"
+    },
+    "clearAllTitle": {
+        "message": "危险操作: 抹除配置"
+    },
+    "clearAllDesc": {
+        "message": "一键清空本地所有的状态跟API密匙"
+    },
+    "toastClearConfirm": {
+        "message": "这会清除你在插件设定过的一切值，确定继续吗?"
+    },
+    "toastCleared": {
+        "message": "设置已经重置"
+    },
+    "clearAllBtn": {
+        "message": "一键恢复出厂设置"
+    },
+    "otherTitle": {
+        "message": "其它杂项"
+    },
+    "otherDesc": {
+        "message": "相关开发者扩展。"
+    },
+    "resetTitle": {
+        "message": "软重置选项"
+    },
+    "resetDesc": {
+        "message": "恢复默认的值。"
+    },
+    "toastResetConfirm": {
+        "message": "确定要重置这个页面的选项吗？"
+    },
+    "resetBtn": {
+        "message": "从默认文件加载"
+    },
+    "encryptTitle": {
+        "message": "本地存储加密"
+    },
+    "encryptDesc": {
+        "message": "对本地保存的聊天记录和设置进行加密。"
+    },
+    "permissionTitle": {
+        "message": "权限控制"
+    },
+    "confirmToolTitle": {
+        "message": "工具调用确认"
+    },
+    "confirmToolDesc": {
+        "message": "AI 调用页面工具前需要用户手动确认。"
+    },
+    "filterTitle": {
+        "message": "敏感数据过滤"
+    },
+    "filterDesc": {
+        "message": "发送到 AI 前自动过滤页面中的敏感信息。"
+    },
+    "aboutTitle": {
+        "message": "关于 Page MCP"
+    },
+    "aboutVersion": {
+        "message": "版本"
+    },
+    "aboutAuthor": {
+        "message": "作者"
+    },
+    "aboutLicense": {
+        "message": "许可"
+    },
+    "aboutHomepage": {
+        "message": "主页"
+    },
+    "overrideDetected": {
+        "message": "检测到原生聊天:"
+    },
+    "overrideBtn": {
+        "message": "接管"
+    },
+    "toastReset": {
+        "message": "设置已重置"
+    },
+    "navRemoteServices": {
+        "message": "MCP/Skills"
+    },
+    "remoteServicesTitle": {
+        "message": "MCP/Skills"
+    },
+    "remoteServicesDesc": {
+        "message": "管理在设置中创建的 MCP/Skills 仓库（与远程仓库隔离）。"
+    },
+    "remoteSearchTitle": {
+        "message": "搜索 MCP/Skills 仓库"
+    },
+    "remoteSearchDesc": {
+        "message": "按仓库名称或域名筛选。"
+    },
+    "remoteSearchPlaceholder": {
+        "message": "输入仓库名称或域名"
+    },
+    "remoteLoading": {
+        "message": "正在加载 MCP/Skills 仓库..."
+    },
+    "remoteEmpty": {
+        "message": "暂无 MCP/Skills 仓库。"
+    },
+    "remoteDomain": {
+        "message": "域名"
+    },
+    "remoteVersion": {
+        "message": "版本"
+    },
+    "remoteMarket": {
+        "message": "市场"
+    },
+    "remoteViewDetail": {
+        "message": "详情"
+    },
+    "remoteDelete": {
+        "message": "删除"
+    },
+    "remoteLoadingSwitchTitle": {
+        "message": "启用远程加载"
+    },
+    "remoteLoadingSwitchDesc": {
+        "message": "打开页面时按需加载已安装仓库的远程 MCP/Skills。"
+    },
+    "marketWhitelistTitle": {
+        "message": "市场源白名单"
+    },
+    "marketWhitelistDesc": {
+        "message": "仅允许这些市场域名触发安装写入。"
+    },
+    "marketWhitelistEmpty": {
+        "message": "暂无白名单来源"
+    },
+    "marketWhitelistPlaceholder": {
+        "message": "例如: http://localhost:5173"
+    },
+    "testTitle": {
+        "message": "AI 模型联通测试"
+    },
+    "testDesc": {
+        "message": "验证当前模型接口是否可用。"
+    },
+    "remoteDeleteConfirm": {
+        "message": "确认删除该远程仓库吗？"
+    },
+    "remoteDeleteDialogTitle": {
+        "message": "删除远程仓库"
+    },
+    "remoteDeleteDialogDesc": {
+        "message": "确认删除仓库 {name} 吗？"
+    },
+    "remoteDeleteCancel": {
+        "message": "取消"
+    },
+    "remoteDeleteConfirmBtn": {
+        "message": "确认删除"
+    }
+}

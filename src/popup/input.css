@@ -1,0 +1,53 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+    --color-primary: #3994ef;
+    --color-background-light: #f6f7f8;
+    --color-background-dark: #101922;
+    --font-display: "Inter", sans-serif;
+}
+
+@layer utilities {
+    .glass-effect {
+        background: rgba(57, 148, 239, 0.05);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .custom-scrollbar::-webkit-scrollbar {
+        width: 4px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: rgba(57, 148, 239, 0.2);
+        border-radius: 10px;
+    }
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+}
+
+/* Tab Active Styles Extraction Since Tailwind plugin/forms is missing */
+.tab-btn {
+    @apply text-slate-500 hover:text-slate-700 dark:hover:text-slate-300;
+}
+
+.tab-btn.active {
+    @apply bg-white dark:bg-primary shadow-sm text-primary dark:text-white;
+}
+
+/* Hide scrollbar for standard view if it gets too long with small content */
+.view-panel {
+    display: flex;
+    flex-direction: column;
+}
+
+.view-panel.hidden {
+    display: none;
+}
