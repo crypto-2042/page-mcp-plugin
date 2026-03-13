@@ -1,4 +1,5 @@
 import type { InstalledRemoteRepository } from '../shared/types.js';
+import { matchesDomainPattern } from '../shared/domain-match.js';
 
 export interface SourceTagged {
     sourceType: 'native' | 'remote';
@@ -37,15 +38,8 @@ export interface McpBucketContent<TTool = RemoteMcpItem, TPrompt = RemoteMcpItem
 
 const regexCache = new Map<string, RegExp | null>();
 
-export function matchesDomain(hostname: string, siteDomain: string): boolean {
-    const host = hostname.toLowerCase();
-    const domain = siteDomain.toLowerCase();
-    if (domain.startsWith('*.')) {
-        const base = domain.slice(2);
-        return host === base || host.endsWith(`.${base}`);
-    }
-    return host === domain;
-}
+/** @deprecated Use matchesDomainPattern from shared/domain-match.ts */
+export const matchesDomain = matchesDomainPattern;
 
 export function marketLabelFromOrigin(origin: string): string {
     try {

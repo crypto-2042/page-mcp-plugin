@@ -1,21 +1,18 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
-import { PostMessageTransport, PageMcpClient } from '@page-mcp/core';
 import type {
     AnthropicMcpPrompt as PromptInfo,
     AnthropicMcpResource as ResourceInfo,
     AnthropicMcpTool as ToolInfo,
 } from '@page-mcp/protocol';
-import { PM_CHANNEL, MAX_QUICK_PROMPTS } from '../shared/constants.js';
-import { DEFAULT_SETTINGS, PluginSettings, Conversation, ChatMessage } from '../shared/types.js';
+import { MAX_QUICK_PROMPTS } from '../shared/constants.js';
+import { generateConversationId, generateMessageId } from '../shared/id.js';
+import type { ChatMessage, Conversation } from '../shared/types.js';
 import { generatePluginStyles } from './styles.js';
 import { renderMarkdown } from './markdown.js';
 import { formatToolResult } from './tool-result-format.js';
 import { buildQuickActionCandidates } from './quick-actions.js';
-import { isExtensionContextInvalidatedError } from './runtime-error.js';
-import { injectExtensionIdMeta } from './market-extension-id.js';
-import { buildExecutionCatalog, type ExecutableTool } from './execution-catalog.js';
-import { loadNativeMcpState } from './mcp-discovery.js';
+import { buildExecutionCatalog } from './execution-catalog.js';
 import { buildAttachedResourceMessages } from './mcp-resources.js';
 import { applyPromptShortcutMessages } from './mcp-prompt-shortcuts.js';
 import {
@@ -26,133 +23,66 @@ import {
 import {
     buildOpenAiToolsFromCatalog,
     toOpenAiConversationMessages,
-    type OpenAIChatCompletionResponse,
+    type OpenAiToolDefinition,
     type OpenAIChatMessage,
-    type OpenAIResponseMessage,
 } from './mcp-openai.js';
 import { filterRenderableMessages } from './chat-message-visibility.js';
 import { getToolCallResultPayload } from './tool-call-display.js';
-import { runMcpConversationTurn } from './mcp-conversation-turn.js';
 import { createMcpChatRuntime } from './mcp-chat-runtime.js';
 import { runChatAction } from './mcp-chat-actions.js';
+import { safeRuntimeMessage } from './safe-runtime.js';
+
+// Hooks
+import { usePluginSettings } from './hooks/use-settings.js';
+import { useMcpDiscovery } from './hooks/use-mcp-discovery.js';
+import { useConversationManager } from './hooks/use-conversations.js';
+import { useWidgetVisibility } from './hooks/use-widget-visibility.js';
 
 // Icons
 import { MessageSquare, X, Send, Clock, Plus, Settings as SettingsIcon, Trash2, ChevronDown, ChevronUp, Layers3 } from 'lucide-react';
 
 const currentDomain = window.location.hostname;
+
 type WithSource<T> = T & {
     sourceType: 'native';
     sourceLabel: 'native';
 };
+
 type StreamPortMessage =
     | { type: 'CHUNK'; delta: string }
     | { type: 'DONE' }
     | { type: 'ERROR'; error: string };
-type CapabilityState = {
-    tools: Array<WithSource<ToolInfo>>;
-    prompts: Array<WithSource<PromptInfo>>;
-    resources: Array<WithSource<ResourceInfo>>;
-    hostInfo: { name: string; version: string };
-};
-const devWarn = (...args: unknown[]) => {
-    if (import.meta.env.DEV) {
-        console.warn(...args);
-    }
-};
+
+// ============================================================
+// ChatWidget Component
+// ============================================================
 
 const ChatWidget = () => {
-    const [settings, setSettings] = useState<PluginSettings>(DEFAULT_SETTINGS);
-    const [mcpClient, setMcpClient] = useState<PageMcpClient | null>(null);
-    const [tools, setTools] = useState<WithSource<ToolInfo>[]>([]);
-    const [prompts, setPrompts] = useState<WithSource<PromptInfo>[]>([]);
-    const [resources, setResources] = useState<WithSource<ResourceInfo>[]>([]);
-    const [conversations, setConversations] = useState<Conversation[]>([]);
-    const [activeConvId, setActiveConvId] = useState<string | null>(null);
+    // --- Hooks ---
+    const { settings, isLoaded, t } = usePluginSettings();
+    const { mcpClient, tools, prompts, resources, hasNativeChat } = useMcpDiscovery(settings, isLoaded);
+    const {
+        conversations, activeConvId, activeConv, setActiveConvId,
+        startNewChat, deleteConv, persistConv, upsertConversation, createConversation,
+    } = useConversationManager(currentDomain, t);
+    const widgetVisible = useWidgetVisibility(settings, hasNativeChat, tools, prompts, resources);
 
-    // UI State
+    // --- UI State ---
     const [panelOpen, setPanelOpen] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [quickActionsOpen, setQuickActionsOpen] = useState(false);
     const [resourcePanelOpen, setResourcePanelOpen] = useState(false);
-    const [hasNativeChat, setHasNativeChat] = useState(false);
-    const [hoverTimeout, setHoverTimeout] = useState<NodeJS.Timeout | null>(null);
-    const [widgetVisible, setWidgetVisible] = useState(false);
-
     const [inputText, setInputText] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [attachedResourceUris, setAttachedResourceUris] = useState<string[]>([]);
     const [expandedToolDetails, setExpandedToolDetails] = useState<Record<string, boolean>>({});
+
+    // Use useRef for hover timeout to avoid unnecessary re-renders (P2 #15)
+    const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const qaHovered = useRef(false);
-    const settingsRef = useRef<PluginSettings>(DEFAULT_SETTINGS);
-    const nativeBaseRef = useRef<CapabilityState>({
-        tools: [],
-        prompts: [],
-        resources: [],
-        hostInfo: { name: 'remote-only', version: '1.0.0' },
-    });
-    const refreshByPathRef = useRef<(() => Promise<void>) | null>(null);
-    const lastPathRef = useRef<string>(window.location.pathname);
-    const extensionContextInvalidatedRef = useRef(false);
 
-    const logRuntimeError = (context: string, error: unknown) => {
-        if (isExtensionContextInvalidatedError(error)) {
-            extensionContextInvalidatedRef.current = true;
-            return;
-        }
-        devWarn(`[Page MCP Content] ${context} failed:`, error);
-    };
-
-    const safeRuntimeMessage = async <T,>(context: string, payload: any): Promise<T | undefined> => {
-        if (extensionContextInvalidatedRef.current) return undefined;
-        try {
-            return await chrome.runtime.sendMessage(payload) as T;
-        } catch (error) {
-            logRuntimeError(context, error);
-            return undefined;
-        }
-    };
-
-    // Refs to keep latest MCP data accessible in chrome.runtime.onMessage listener
-    const toolsRef = useRef<WithSource<ToolInfo>[]>([]);
-    const promptsRef = useRef<WithSource<PromptInfo>[]>([]);
-    const resourcesRef = useRef<WithSource<ResourceInfo>[]>([]);
-    toolsRef.current = tools;
-    promptsRef.current = prompts;
-    resourcesRef.current = resources;
-
-    const activeConv = conversations.find(c => c.id === activeConvId);
-
-    // Initialization
-
-    const [dict, setDict] = useState<Record<string, { message: string }>>({});
-
-    useEffect(() => {
-        // In content scripts on arbitrary pages, fetching extension locale files can be blocked
-        // by web_accessible_resources. chrome.i18n remains available, so keep dict empty here.
-        setDict({});
-    }, [settings?.language]);
-
-    useEffect(() => {
-        settingsRef.current = settings;
-    }, [settings]);
-
-    const t = (key: string, subs?: Record<string, string> | any) => {
-        let msg = dict[key]?.message;
-        if (!msg) {
-            try {
-                msg = chrome.i18n.getMessage(key);
-            } catch (e) { }
-        }
-        msg = msg || key;
-        if (subs && typeof subs === 'object' && !Array.isArray(subs)) {
-            Object.entries(subs).forEach(([k, v]) => {
-                msg = msg.replace('{' + k + '}', String(v));
-            });
-        }
-        return msg;
-    };
-
+    // --- Derived ---
     const stopPageShortcutPropagation = (e: React.KeyboardEvent) => {
         e.stopPropagation();
         const native = e.nativeEvent as KeyboardEvent;
@@ -160,238 +90,6 @@ const ChatWidget = () => {
             native.stopImmediatePropagation();
         }
     };
-
-
-    useEffect(() => {
-        const applyCapabilities = (
-            next: {
-                tools: Array<WithSource<ToolInfo>>;
-                prompts: Array<WithSource<PromptInfo>>;
-                resources: Array<WithSource<ResourceInfo>>;
-            },
-            hostInfo: { name: string; version: string }
-        ) => {
-            setTools(next.tools);
-            setPrompts(next.prompts);
-            setResources(next.resources);
-            safeRuntimeMessage('MCP_DETECTED', {
-                type: 'MCP_DETECTED',
-                hostInfo,
-                toolCount: next.tools.length + next.prompts.length + next.resources.length,
-            });
-        };
-
-        const refreshByPath = async () => {
-            const base = nativeBaseRef.current;
-            const hasNativeBase = base.tools.length > 0 || base.prompts.length > 0 || base.resources.length > 0;
-            applyCapabilities({
-                tools: base.tools,
-                prompts: base.prompts,
-                resources: base.resources,
-            }, hasNativeBase ? base.hostInfo : { name: 'remote-only', version: '1.0.0' });
-        };
-
-        refreshByPathRef.current = refreshByPath;
-
-        const init = async () => {
-            let s = { ...DEFAULT_SETTINGS };
-            const settingsRes = await safeRuntimeMessage<{ settings?: PluginSettings }>('GET_SETTINGS', { type: 'GET_SETTINGS' });
-            if (settingsRes?.settings) s = settingsRes.settings;
-            setSettings(s);
-            settingsRef.current = s;
-
-            try {
-                injectExtensionIdMeta(document, chrome.runtime.id);
-            } catch (e) {
-                console.warn('[Page MCP Content] inject extension id meta failed:', e);
-            }
-            const conversationsRes = await safeRuntimeMessage<{ conversations?: Conversation[] }>(
-                'GET_CONVERSATIONS',
-                { type: 'GET_CONVERSATIONS', domain: currentDomain }
-            );
-            if (conversationsRes?.conversations) setConversations(conversationsRes.conversations);
-
-            const nativeChat = !!document.getElementById('page-mcp-chat-widget');
-            setHasNativeChat(nativeChat);
-
-            safeRuntimeMessage('PAGE_CHAT_STATUS', { type: 'PAGE_CHAT_STATUS', hasNativeChat: nativeChat, domain: currentDomain });
-
-            if (s.autoDetect) {
-                console.log('[Page MCP Content] Starting MCP detection...');
-                const transport = new PostMessageTransport({ channel: PM_CHANNEL + '-ext-bridge', role: 'client', timeout: 10000 });
-                const client = new PageMcpClient({ transport, connectTimeout: 10000 });
-
-                let bridgeReady = false;
-                const onMsg = (e: MessageEvent) => {
-                    if (e.data?.channel === PM_CHANNEL + '-ext-bridge' && e.data?.type === 'bridge:ready') {
-                        bridgeReady = true;
-                        console.log('[Page MCP Content] Bridge ready received');
-                    }
-                };
-                window.addEventListener('message', onMsg);
-
-                // Poll for bridge:ready up to 8 seconds (the bridge polls for host every 500ms)
-                const maxWaitMs = 8000;
-                const pollMs = 500;
-                for (let waited = 0; waited < maxWaitMs && !bridgeReady; waited += pollMs) {
-                    window.postMessage({
-                        channel: PM_CHANNEL + '-ext-bridge',
-                        type: 'bridge:ping',
-                        payload: {},
-                    }, '*');
-                    await new Promise(r => setTimeout(r, pollMs));
-                }
-
-                window.removeEventListener('message', onMsg);
-                console.log('[Page MCP Content] Bridge ready:', bridgeReady);
-
-                if (!bridgeReady) {
-                    const hasNativeWidget = !!document.getElementById('page-mcp-chat-widget');
-                    if (!hasNativeWidget) {
-                        devWarn('[Page MCP Content] Bridge ready signal not observed; skip native MCP connect');
-                        return;
-                    }
-                    devWarn('[Page MCP Content] Bridge ready signal not observed; native widget detected, attempt connect once');
-                }
-                try {
-                    const nativeState = await loadNativeMcpState(client);
-                    console.log('[Page MCP Content] Client connected, host:', nativeState.hostInfo);
-                    setMcpClient(client);
-                    const nativeTools = nativeState.tools;
-                    const nativePrompts = nativeState.prompts;
-                    const nativeResources = nativeState.resources;
-                    console.log('[Page MCP Content] Tools:', nativeTools.length, 'Prompts:', nativePrompts.length);
-                    console.log('[Page MCP Content] Resources:', nativeResources.length);
-
-                    const host = nativeState.hostInfo;
-                    nativeBaseRef.current = {
-                        tools: nativeTools as Array<WithSource<ToolInfo>>,
-                        prompts: nativePrompts as Array<WithSource<PromptInfo>>,
-                        resources: nativeResources,
-                        hostInfo: host,
-                    };
-                    applyCapabilities({
-                        tools: nativeTools as Array<WithSource<ToolInfo>>,
-                        prompts: nativePrompts as Array<WithSource<PromptInfo>>,
-                        resources: nativeResources as Array<WithSource<ResourceInfo>>,
-                    }, host);
-                } catch (e) {
-                    devWarn('[Page MCP Content] Client connect failed:', e);
-                    setMcpClient(null);
-                    nativeBaseRef.current = {
-                        tools: [],
-                        prompts: [],
-                        resources: [],
-                        hostInfo: { name: 'remote-only', version: '1.0.0' },
-                    };
-                    applyCapabilities({ tools: [], prompts: [], resources: [] }, { name: 'remote-only', version: '1.0.0' });
-                }
-            }
-        };
-
-        init();
-
-        const observer = new MutationObserver(() => {
-            const native = !!document.getElementById('page-mcp-chat-widget');
-            setHasNativeChat(native);
-        });
-        observer.observe(document.documentElement, { childList: true, subtree: true });
-
-        const emitPathChange = () => window.dispatchEvent(new Event('pmcp:pathchange'));
-        const maybeEmitPathChange = () => {
-            const next = window.location.pathname;
-            if (next === lastPathRef.current) return;
-            lastPathRef.current = next;
-            emitPathChange();
-        };
-
-        const onPathChange = () => {
-            refreshByPathRef.current?.().catch((err) => {
-                console.warn('[Page MCP Content] refresh on path change failed:', err);
-            });
-        };
-        window.addEventListener('pmcp:pathchange', onPathChange);
-        window.addEventListener('popstate', onPathChange);
-        window.addEventListener('hashchange', onPathChange);
-        document.addEventListener('turbo:load', maybeEmitPathChange as EventListener);
-        document.addEventListener('pjax:end', maybeEmitPathChange as EventListener);
-        const pathWatchTimer = window.setInterval(maybeEmitPathChange, 300);
-
-        const onSettingsMsg = (msg: any, _sender: any, sendResponse: (response?: any) => void) => {
-            if (msg.type === 'SETTINGS_CHANGED') {
-                setSettings(msg.settings);
-                settingsRef.current = msg.settings;
-                refreshByPathRef.current?.().catch(() => { });
-            }
-            if (msg.type === 'QUERY_PAGE_CHAT_STATUS') {
-                sendResponse({ ok: true });
-                return true;
-            }
-            if (msg.type === 'QUERY_PAGE_MCP_CAPABILITIES') {
-                sendResponse({
-                    ok: true,
-                    data: {
-                        tools: toolsRef.current,
-                        prompts: promptsRef.current,
-                        resources: resourcesRef.current,
-                        skills: [],
-                    }
-                });
-                return true;
-            }
-        };
-        chrome.runtime.onMessage.addListener(onSettingsMsg);
-
-        return () => {
-            observer.disconnect();
-            chrome.runtime.onMessage.removeListener(onSettingsMsg);
-            window.removeEventListener('pmcp:pathchange', onPathChange);
-            window.removeEventListener('popstate', onPathChange);
-            window.removeEventListener('hashchange', onPathChange);
-            document.removeEventListener('turbo:load', maybeEmitPathChange as EventListener);
-            document.removeEventListener('pjax:end', maybeEmitPathChange as EventListener);
-            window.clearInterval(pathWatchTimer);
-        };
-    }, []);
-
-    // Visibility computation
-    useEffect(() => {
-        const isDomainOverridden = settings.overridePageChat && settings.overrideSites.some(site => {
-            if (site.startsWith('*.')) { const base = site.slice(2); return currentDomain === base || currentDomain.endsWith('.' + base); }
-            return currentDomain === site;
-        });
-
-        if (hasNativeChat && !isDomainOverridden) {
-            setWidgetVisible(false);
-            return;
-        }
-
-        if (settings.alwaysInjectChat) {
-            setWidgetVisible(true);
-            return;
-        }
-
-        const hasResources = tools.length > 0 || prompts.length > 0 || resources.length > 0;
-        if (settings.injectChatOnResources && hasResources) {
-            setWidgetVisible(true);
-            return;
-        }
-
-        setWidgetVisible(false);
-    }, [settings, hasNativeChat, tools, prompts, resources]);
-
-    // Handle Native chat hidding
-    useEffect(() => {
-        const nativeEl = document.getElementById('page-mcp-chat-widget');
-        const isDomainOverridden = settings.overridePageChat && settings.overrideSites.some(site => {
-            if (site.startsWith('*.')) return currentDomain.endsWith(site.slice(1)) || currentDomain === site.slice(2);
-            return currentDomain === site;
-        });
-
-        if (nativeEl) {
-            nativeEl.style.display = (isDomainOverridden) ? 'none' : '';
-        }
-    }, [hasNativeChat, settings.overridePageChat, settings.overrideSites]);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -403,39 +101,6 @@ const ChatWidget = () => {
         setAttachedResourceUris((current) => getInitialAttachedResourceUris(resources, current));
     }, [resources]);
 
-        const persistConv = async (conv: Conversation) => {
-        conv.updatedAt = Date.now();
-        if (conv.title === 'New Chat' || conv.title === t('newChatTitle')) {
-            const first = conv.messages.find(m => m.role === 'user');
-            if (first) {
-                conv.title = first.content.slice(0, 40) + (first.content.length > 40 ? '...' : '');
-            }
-        }
-
-        let newConvs = [...conversations];
-        const idx = newConvs.findIndex(c => c.id === conv.id);
-        if (idx >= 0) newConvs[idx] = conv;
-        else newConvs.unshift(conv);
-
-        setConversations(newConvs);
-        await safeRuntimeMessage('SAVE_CONVERSATION', { type: 'SAVE_CONVERSATION', conversation: conv });
-    };
-
-    const startNewChat = () => {
-        const newId = `conv_${Date.now()}`;
-        const newConv: Conversation = { id: newId, title: t('newChatTitle', undefined) || 'New Chat', domain: currentDomain, createdAt: Date.now(), updatedAt: Date.now(), messages: [] };
-        setConversations(prev => [newConv, ...prev]);
-        setActiveConvId(newId);
-    };
-
-    const deleteConv = async (id: string, e: React.MouseEvent) => {
-        e.stopPropagation();
-        const updated = conversations.filter(c => c.id !== id);
-        setConversations(updated);
-        await safeRuntimeMessage('DELETE_CONVERSATION', { type: 'DELETE_CONVERSATION', conversationId: id });
-        if (activeConvId === id) setActiveConvId(null);
-    };
-
     const formatMessageTime = (timestamp: number): string => {
         const d = new Date(timestamp);
         const hh = String(d.getHours()).padStart(2, '0');
@@ -443,9 +108,11 @@ const ChatWidget = () => {
         return `${hh}:${mm}`;
     };
 
+    // --- Stream Completion ---
     const streamCompletion = async (
         messages: OpenAIChatMessage[],
-        onDelta: (delta: string) => void
+        onDelta: (delta: string) => void,
+        streamTools?: OpenAiToolDefinition[],
     ): Promise<void> => {
         await new Promise<void>((resolve, reject) => {
             const port = chrome.runtime.connect({ name: 'PMCP_AI_STREAM' });
@@ -457,15 +124,15 @@ const ChatWidget = () => {
                     }
                     return;
                 }
-                port.onMessage.removeListener(onMessage as any);
+                port.onMessage.removeListener(onMessage as Parameters<typeof port.onMessage.addListener>[0]);
                 port.disconnect();
                 if (msg.type === 'DONE') {
                     resolve();
                     return;
                 }
-                reject(new Error((msg as any).error || 'Stream failed'));
+                reject(new Error((msg as { error?: string }).error || 'Stream failed'));
             };
-            port.onMessage.addListener(onMessage as any);
+            port.onMessage.addListener(onMessage as Parameters<typeof port.onMessage.addListener>[0]);
             port.postMessage({
                 type: 'START_STREAM',
                 endpoint: '/chat/completions',
@@ -473,52 +140,37 @@ const ChatWidget = () => {
                     model: settings.model,
                     messages,
                     stream: true,
+                    ...(streamTools && streamTools.length > 0 ? { tools: streamTools } : {}),
                 },
             });
         });
     };
 
-    const upsertConversation = (conv: Conversation) => {
-        setConversations(prev => {
-            const copy = [...prev];
-            const idx = copy.findIndex(c => c.id === conv.id);
-            if (idx >= 0) copy[idx] = conv;
-            else copy.unshift(conv);
-            return copy;
-        });
-    };
-
+    // --- Chat Runtime ---
     const chatRuntime = createMcpChatRuntime({
         model: settings.model,
         mcpClient,
-        tools: tools as any,
-        prompts: prompts as any,
-        resources: resources as any,
+        tools: tools as Array<WithSource<ToolInfo>>,
+        prompts: prompts as Array<WithSource<PromptInfo>>,
+        resources: resources as Array<WithSource<ResourceInfo>>,
         buildExecutionCatalog,
         buildOpenAiToolsFromCatalog,
-        toOpenAiMessages: (messages) => toOpenAiConversationMessages(messages) as OpenAIChatMessage[],
+        toOpenAiMessages: (msgs) => toOpenAiConversationMessages(msgs) as OpenAIChatMessage[],
         formatToolResult,
         safeRuntimeMessage,
         streamCompletion,
-        runConversationTurn: runMcpConversationTurn,
     });
 
+    // --- Send / Prompt Handlers ---
     const handleSend = async (text: string = inputText) => {
         if (!text.trim() || isLoading) return;
         setInputText('');
 
         await runChatAction({
-            activeConversation: activeConv ?? null,
-            createConversation: () => ({
-                id: `conv_${Date.now()}`,
-                title: t('newChatTitle', undefined) || 'New Chat',
-                domain: currentDomain,
-                createdAt: Date.now(),
-                updatedAt: Date.now(),
-                messages: [],
-            }),
+            activeConversation: activeConv,
+            createConversation,
             prepareMessages: async () => {
-                const userMessage: ChatMessage = { id: `msg_${Date.now()}`, role: 'user', content: text, timestamp: Date.now() };
+                const userMessage: ChatMessage = { id: generateMessageId(), role: 'user', content: text, timestamp: Date.now() };
                 const resourceMessages = mcpClient
                     ? await buildAttachedResourceMessages({
                         selectedUris: attachedResourceUris,
@@ -550,15 +202,8 @@ const ChatWidget = () => {
         if (isLoading || !mcpClient) return;
 
         await runChatAction({
-            activeConversation: activeConv ?? null,
-            createConversation: () => ({
-                id: `conv_${Date.now()}`,
-                title: t('newChatTitle', undefined) || 'New Chat',
-                domain: currentDomain,
-                createdAt: Date.now(),
-                updatedAt: Date.now(),
-                messages: [],
-            }),
+            activeConversation: activeConv,
+            createConversation,
             prepareMessages: async () => {
                 const resourceMessages = await buildAttachedResourceMessages({
                     selectedUris: attachedResourceUris,
@@ -589,23 +234,23 @@ const ChatWidget = () => {
         });
     };
 
+    // --- Quick Actions ---
     const totalCapabilities = tools.length + prompts.length + resources.length;
     const selectedResourceCountLabel = getSelectedResourceCountLabel(attachedResourceUris);
     const quickSuggestionItems = buildQuickActionCandidates({
-        prompts: prompts as any[],
-        tools: tools as any[],
-        resources: resources as any[],
+        prompts: prompts as PromptInfo[],
+        tools: tools as ToolInfo[],
+        resources: resources as ResourceInfo[],
     }).map((item) => ({
         key: item.key,
         label: item.label,
         icon: item.icon,
-        action: () => {
-            handlePromptShortcut(item.name);
-        },
+        action: () => { handlePromptShortcut(item.name); },
     }));
 
     if (!widgetVisible) return null;
 
+    // --- Render ---
     return (
         <div id="page-mcp-plugin-react" className={`${settings.theme === 'dark' ? 'dark' : ''} ${settings.theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : '') : ''}`}>
             {/* FAB */}
@@ -613,11 +258,11 @@ const ChatWidget = () => {
                 className={`pmcp-fab ${settings.position} ${panelOpen ? 'panel-open active' : ''} ${quickActionsOpen ? 'active' : ''}`}
                 onMouseEnter={() => {
                     if (!panelOpen) {
-                        setHoverTimeout(setTimeout(() => setQuickActionsOpen(true), 200));
+                        hoverTimeoutRef.current = setTimeout(() => setQuickActionsOpen(true), 200);
                     }
                 }}
                 onMouseLeave={() => {
-                    if (hoverTimeout) clearTimeout(hoverTimeout);
+                    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
                     setTimeout(() => { if (!qaHovered.current) setQuickActionsOpen(false); }, 300);
                 }}
                 onClick={() => {
@@ -665,18 +310,16 @@ const ChatWidget = () => {
             </div>
 
             {/* Chat Panel */}
-            <div
-                className={`pmcp-panel ${settings.position} ${panelOpen ? 'open' : ''}`}
-            >
+            <div className={`pmcp-panel ${settings.position} ${panelOpen ? 'open' : ''}`}>
                 <div className="pmcp-panel-header">
                     <div className="pmcp-header-left">
-                        <button className="pmcp-btn-icon pmcp-btn-sidebar" onClick={() => setSidebarOpen(!sidebarOpen)} title="Chat History"><Clock size={18} /></button>
+                        <button className="pmcp-btn-icon pmcp-btn-sidebar" onClick={() => setSidebarOpen(!sidebarOpen)} title={t('chatHistory')}><Clock size={18} /></button>
                         <span className="pmcp-header-dot"></span>
-                        <span className="pmcp-header-title">{activeConv?.title || 'New Chat'}</span>
+                        <span className="pmcp-header-title">{activeConv?.title || t('newChatTitle') || 'New Chat'}</span>
                     </div>
                     <div className="pmcp-header-actions">
-                        <button className="pmcp-btn-icon pmcp-btn-new" onClick={startNewChat} title="New Chat"><Plus size={18} /></button>
-                        <button className="pmcp-btn-icon pmcp-btn-close" onClick={() => setPanelOpen(false)} title="Close"><X size={18} /></button>
+                        <button className="pmcp-btn-icon pmcp-btn-new" onClick={startNewChat} title={t('newChatTitle')}><Plus size={18} /></button>
+                        <button className="pmcp-btn-icon pmcp-btn-close" onClick={() => setPanelOpen(false)} title={t('close')}><X size={18} /></button>
                     </div>
                 </div>
 
@@ -684,11 +327,11 @@ const ChatWidget = () => {
                     {/* Sidebar */}
                     <div className={`pmcp-sidebar ${sidebarOpen ? 'open' : ''}`}>
                         <div className="pmcp-sidebar-header">
-                            <span>Chat History</span>
+                            <span>{t('chatHistory') || 'Chat History'}</span>
                             <button className="pmcp-btn-icon pmcp-btn-sidebar-close" onClick={() => setSidebarOpen(false)}><X size={16} /></button>
                         </div>
                         <div className="pmcp-sidebar-list">
-                            {conversations.length === 0 ? <div className="pmcp-sidebar-empty">No conversations yet</div> :
+                            {conversations.length === 0 ? <div className="pmcp-sidebar-empty">{t('noConversations') || 'No conversations yet'}</div> :
                                 conversations.map(c => (
                                     <div key={c.id} className={`pmcp-sidebar-item ${c.id === activeConvId ? 'active' : ''}`} onClick={() => { setActiveConvId(c.id); setSidebarOpen(false); }}>
                                         <div className="pmcp-sidebar-item-content">
@@ -708,8 +351,8 @@ const ChatWidget = () => {
                             {(!activeConv || activeConv.messages.length === 0) && (
                                 <div className="pmcp-welcome">
                                     <div className="pmcp-welcome-icon"><MessageSquare size={32} /></div>
-                                    <div className="pmcp-welcome-title">AI Assistant</div>
-                                    <div className="pmcp-welcome-sub">{totalCapabilities > 0 ? `Connected · ${totalCapabilities} capabilities available` : 'Start a conversation'}</div>
+                                    <div className="pmcp-welcome-title">{t('aiAssistant') || 'AI Assistant'}</div>
+                                    <div className="pmcp-welcome-sub">{totalCapabilities > 0 ? `${t('connected') || 'Connected'} · ${totalCapabilities} ${t('capabilitiesAvailable') || 'capabilities available'}` : t('startConversation') || 'Start a conversation'}</div>
                                     <div className="pmcp-welcome-prompts">
                                         {quickSuggestionItems.slice(0, MAX_QUICK_PROMPTS).map(item => (
                                             <button key={item.key} className="pmcp-welcome-prompt-btn" onClick={item.action}>
@@ -759,19 +402,18 @@ const ChatWidget = () => {
                                 }
 
                                 const roleClass = m.role === 'user' ? 'pmcp-msg-user' : 'pmcp-msg-assistant';
-                                const roleLabel = m.role === 'user' ? 'You' : 'Assistant';
-                                const roleAvatar = m.role === 'user' ? 'Y' : 'AI';
+                                const roleLabel = m.role === 'user' ? (t('you') || 'You') : (t('assistant') || 'Assistant');
 
                                 return (
                                     <div key={m.id || i} className={`pmcp-msg ${roleClass}`}>
                                         <div className="pmcp-msg-row">
                                             <div className="pmcp-msg-main">
-                                                    <div className="pmcp-msg-label-row">
-                                                        <div className="pmcp-msg-label">{roleLabel}</div>
-                                                        <div className="pmcp-msg-time">{formatMessageTime(m.timestamp)}</div>
-                                                    </div>
-                                                    <div className="pmcp-bubble pmcp-message-content" dangerouslySetInnerHTML={{ __html: renderMarkdown(m.content) }}></div>
+                                                <div className="pmcp-msg-label-row">
+                                                    <div className="pmcp-msg-label">{roleLabel}</div>
+                                                    <div className="pmcp-msg-time">{formatMessageTime(m.timestamp)}</div>
                                                 </div>
+                                                <div className="pmcp-bubble pmcp-message-content" dangerouslySetInnerHTML={{ __html: renderMarkdown(m.content) }}></div>
+                                            </div>
                                         </div>
                                     </div>
                                 );
@@ -833,7 +475,7 @@ const ChatWidget = () => {
                                     stopPageShortcutPropagation(e);
                                 }}
                                 onKeyUp={stopPageShortcutPropagation}
-                                placeholder="Type a message..."
+                                placeholder={t('typeMessage') || 'Type a message...'}
                                 disabled={isLoading}
                             />
                             <button className="pmcp-btn-send" onClick={() => handleSend()} disabled={!inputText.trim() || isLoading}><Send size={18} /></button>
@@ -857,7 +499,6 @@ if (!hostWrapper) {
     const rootEl = document.createElement('div');
     shadow.appendChild(rootEl);
 
-    // Inject the bundled index.css from tailwind (wait, content JS does not use Tailwind currently, it uses styles.ts)
     const root = createRoot(rootEl);
     root.render(<ChatWidget />);
 }

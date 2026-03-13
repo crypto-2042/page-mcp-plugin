@@ -40,14 +40,19 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
 
 chrome.runtime.onConnect.addListener((port) => {
     if (port.name !== AI_STREAM_PORT) return;
-    const controller = new AbortController();
+    let activeController: AbortController | null = null;
 
     port.onDisconnect.addListener(() => {
-        controller.abort();
+        activeController?.abort();
     });
 
     port.onMessage.addListener(async (msg) => {
         if (!msg || msg.type !== 'START_STREAM') return;
+
+        // Abort any previous in-flight request on this port
+        activeController?.abort();
+        const controller = new AbortController();
+        activeController = controller;
 
         try {
             const settings = await getSettings();

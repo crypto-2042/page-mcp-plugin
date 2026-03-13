@@ -1,4 +1,5 @@
 import type { ChatMessage, Conversation } from '../shared/types.js';
+import { generateMessageId } from '../shared/id.js';
 
 export async function runChatAction(params: {
     activeConversation: Conversation | null;
@@ -27,7 +28,7 @@ export async function runChatAction(params: {
         await params.runPreparedTurn(conversation);
     } catch (error) {
         const errorMessage: ChatMessage = {
-            id: `msg_${Date.now() + 2}`,
+            id: generateMessageId(),
             role: 'assistant',
             content: `**Error:** ${(error as Error).message}`,
             timestamp: Date.now(),

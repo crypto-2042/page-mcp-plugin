@@ -1,20 +1,13 @@
 import type { ChatMessage } from '../shared/types.js';
+import { generateMessageId, generateToolCallId } from '../shared/id.js';
 import type { ExecutableTool } from './execution-catalog.js';
 import type {
+    OpenAiToolDefinition,
     OpenAIChatCompletionResponse,
     OpenAIChatMessage,
     OpenAIResponseMessage,
     OpenAIToolCall,
 } from './mcp-openai.js';
-
-type OpenAiToolDefinition = {
-    type: 'function';
-    function: {
-        name: string;
-        description: string;
-        parameters: Record<string, unknown>;
-    };
-};
 
 function createToolMessage(params: {
     toolCallId: string;
@@ -26,7 +19,7 @@ function createToolMessage(params: {
     error?: string;
 }): ChatMessage {
     return {
-        id: `msg_tool_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        id: generateMessageId(),
         role: 'tool',
         content: params.status === 'error' ? (params.error || '') : JSON.stringify(params.result ?? null),
         timestamp: Date.now(),
@@ -48,7 +41,7 @@ export async function runMcpConversationTurn(params: {
     buildOpenAiTools: (tools: ExecutableTool[]) => OpenAiToolDefinition[];
     formatToolResult: (result: unknown, outputSchema?: unknown) => string;
     callCompletions: (messages: OpenAIChatMessage[]) => Promise<OpenAIChatCompletionResponse>;
-    streamCompletion: (messages: OpenAIChatMessage[], onDelta: (delta: string) => void) => Promise<void>;
+    streamCompletion: (messages: OpenAIChatMessage[], onDelta: (delta: string) => void, tools?: OpenAiToolDefinition[]) => Promise<void>;
     updateConversation: (messages: ChatMessage[]) => void;
     persistConversation: (messages: ChatMessage[]) => Promise<void>;
 }): Promise<ChatMessage[]> {
@@ -80,7 +73,7 @@ export async function runMcpConversationTurn(params: {
                 const toolMessages: ChatMessage[] = [];
                 for (const call of toolCalls) {
                     if (call?.type !== 'function' || !call.function?.name) continue;
-                    const toolCallId = call.id || `tool_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+                    const toolCallId = call.id || generateToolCallId();
                     let args: Record<string, unknown> = {};
                     try {
                         args = call.function.arguments ? JSON.parse(call.function.arguments) : {};
@@ -156,7 +149,7 @@ export async function runMcpConversationTurn(params: {
         }
 
         const assistantMessage: ChatMessage = {
-            id: `msg_${Date.now() + 1}`,
+            id: generateMessageId(),
             role: 'assistant',
             content: '',
             timestamp: Date.now(),
@@ -165,6 +158,8 @@ export async function runMcpConversationTurn(params: {
         params.updateConversation(messages);
 
         let streamedText = '';
+        // Pass tools definitions to the streaming call so LLMs that require
+        // tools context when tool-result messages are present don't error out.
         await params.streamCompletion(workingMessages, (delta) => {
             streamedText += delta;
             messages = messages.map((message) => (
@@ -173,7 +168,7 @@ export async function runMcpConversationTurn(params: {
                     : message
             ));
             params.updateConversation(messages);
-        });
+        }, openAiTools.length > 0 ? openAiTools : undefined);
 
         if (!streamedText.trim() && responseMessage?.content) {
             messages = messages.map((message) => (
@@ -187,7 +182,7 @@ export async function runMcpConversationTurn(params: {
         return messages;
     } catch (error) {
         const appError: ChatMessage = {
-            id: `msg_${Date.now() + 2}`,
+            id: generateMessageId(),
             role: 'assistant',
             content: `**Error:** ${(error as Error).message}`,
             timestamp: Date.now(),

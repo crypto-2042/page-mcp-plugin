@@ -1,6 +1,15 @@
 import type { ChatMessage } from '../shared/types.js';
 import type { ExecutableTool } from './execution-catalog.js';
 
+export type OpenAiToolDefinition = {
+    type: 'function';
+    function: {
+        name: string;
+        description: string;
+        parameters: Record<string, unknown>;
+    };
+};
+
 export type OpenAIToolCall = {
     id?: string;
     type: 'function';

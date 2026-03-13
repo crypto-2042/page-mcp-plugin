@@ -1,32 +1,36 @@
 import type { ChatMessage, Conversation } from '../shared/types.js';
 import type { ExecutableTool } from './execution-catalog.js';
 import type {
+    OpenAiToolDefinition,
     OpenAIChatCompletionResponse,
     OpenAIChatMessage,
 } from './mcp-openai.js';
+import type { AnthropicMcpTool, AnthropicMcpPrompt, AnthropicMcpResource } from '@page-mcp/protocol';
+import type { PageMcpClient } from '@page-mcp/core';
 import { runMcpConversationTurn } from './mcp-conversation-turn.js';
 
-type OpenAiToolDefinition = {
-    type: 'function';
-    function: {
-        name: string;
-        description: string;
-        parameters: Record<string, unknown>;
-    };
+type SourceTagged = {
+    sourceType: 'native' | 'remote';
+    sourceLabel: string;
 };
 
 export function createMcpChatRuntime(params: {
     model: string;
-    mcpClient: unknown;
-    tools: any[];
-    prompts: any[];
-    resources: any[];
-    buildExecutionCatalog: (params: any) => ExecutableTool[];
+    mcpClient: Pick<PageMcpClient, 'callTool' | 'getPrompt' | 'readResource'> | null;
+    tools: Array<AnthropicMcpTool & SourceTagged>;
+    prompts: Array<AnthropicMcpPrompt & SourceTagged>;
+    resources: Array<AnthropicMcpResource & SourceTagged>;
+    buildExecutionCatalog: (params: {
+        mcpClient: Pick<PageMcpClient, 'callTool' | 'getPrompt' | 'readResource'> | null;
+        tools: Array<AnthropicMcpTool & SourceTagged>;
+        prompts: Array<AnthropicMcpPrompt & SourceTagged>;
+        resources: Array<AnthropicMcpResource & SourceTagged>;
+    }) => ExecutableTool[];
     buildOpenAiToolsFromCatalog: (tools: ExecutableTool[]) => OpenAiToolDefinition[];
     toOpenAiMessages: (messages: ChatMessage[]) => OpenAIChatMessage[];
     formatToolResult: (result: unknown, outputSchema?: unknown) => string;
-    safeRuntimeMessage: <T>(context: string, payload: any) => Promise<T | undefined>;
-    streamCompletion: (messages: OpenAIChatMessage[], onDelta: (delta: string) => void) => Promise<void>;
+    safeRuntimeMessage: <T>(context: string, payload: unknown) => Promise<T | undefined>;
+    streamCompletion: (messages: OpenAIChatMessage[], onDelta: (delta: string) => void, tools?: OpenAiToolDefinition[]) => Promise<void>;
     runConversationTurn?: typeof runMcpConversationTurn;
 }) {
     const runConversation = params.runConversationTurn ?? runMcpConversationTurn;
