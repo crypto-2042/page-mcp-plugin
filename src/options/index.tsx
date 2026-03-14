@@ -266,8 +266,8 @@ const OptionsApp: React.FC = () => {
                         { id: 'general', icon: 'tune', label: t('navGeneral') },
                         { id: 'model', icon: 'psychology', label: t('navModel') },
                         { id: 'interface', icon: 'palette', label: t('navInterface') },
-                        { id: 'security', icon: 'shield_lock', label: t('navSecurity') },
-                        { id: 'remote', icon: 'cloud_sync', label: t('navRemoteServices') || 'MCP/Skills' },
+                        // { id: 'security', icon: 'shield_lock', label: t('navSecurity') },
+                        // { id: 'remote', icon: 'cloud_sync', label: t('navRemoteServices') || 'MCP/Skills' },
                         { id: 'other', icon: 'more_horiz', label: t('navOther') }
                     ].map(nav => (
                         <a
