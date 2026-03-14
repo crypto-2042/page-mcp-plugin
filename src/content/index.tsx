@@ -367,6 +367,10 @@ const ChatWidget = () => {
                             {filterRenderableMessages(activeConv?.messages ?? []).map((m, i) => {
                                 if (m.role === 'tool' && m.toolCalls?.[0]) {
                                     const call = m.toolCalls[0];
+                                    
+                                    const isResourceOrPrompt = call.name.startsWith('resource__') || call.name.startsWith('prompt__') || call.name.startsWith('remote_resource__') || call.name.startsWith('remote_prompt__');
+                                    if (isResourceOrPrompt) return null;
+
                                     const messageId = m.id || String(i);
                                     const expanded = !!expandedToolDetails[messageId];
                                     return (
@@ -439,8 +443,7 @@ const ChatWidget = () => {
                                                 onChange={() => setAttachedResourceUris((current) => toggleAttachedResourceUri(current, resource.uri))}
                                             />
                                             <span className="pmcp-resource-meta">
-                                                <span className="pmcp-resource-name">{resource.name}</span>
-                                                <span className="pmcp-resource-uri">{resource.uri}</span>
+                                                <span className="pmcp-resource-name">{resource.name || resource.uri}</span>
                                             </span>
                                         </label>
                                     );

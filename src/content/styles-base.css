@@ -185,6 +185,11 @@
     font-size: 16px;
     line-height: 1;
     flex-shrink: 0;
+    color: var(--pmcp-text-secondary);
+    transition: color var(--pmcp-transition-fast);
+}
+.pmcp-qa-item:hover .pmcp-qa-item-icon {
+    color: var(--pmcp-text);
 }
 .pmcp-qa-item-svg svg {
     width: 18px;
@@ -559,25 +564,25 @@
 .pmcp-code-block code { color: var(--pmcp-text); }
 
 /* ---- Tables ---- */
-.pmcp-table {
+.pmcp-table, .pmcp-bubble table {
     width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 13px;
-    border-radius: var(--pmcp-radius-sm); overflow: hidden;
+    border-radius: var(--pmcp-radius-sm); overflow-x: auto; display: block;
     border: 1px solid var(--pmcp-border);
 }
-.pmcp-table th, .pmcp-table td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--pmcp-border-light); }
-.pmcp-table th { background: var(--pmcp-bg-glass); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--pmcp-text-secondary); }
-.pmcp-table tbody tr:nth-child(even) { background: var(--pmcp-bg-glass); }
-.pmcp-table tbody tr:hover { background: var(--pmcp-bg-glass-hover); }
+.pmcp-table th, .pmcp-bubble th, .pmcp-table td, .pmcp-bubble td { padding: 8px 12px; text-align: left; border: 1px solid var(--pmcp-border); }
+.pmcp-table th, .pmcp-bubble th { background: var(--pmcp-bg-glass); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--pmcp-text-secondary); }
+.pmcp-table tbody tr:nth-child(even), .pmcp-bubble tbody tr:nth-child(even) { background: var(--pmcp-bg-glass); }
+.pmcp-table tbody tr:hover, .pmcp-bubble tbody tr:hover { background: var(--pmcp-bg-glass-hover); }
 
 /* ---- Headings ---- */
-.pmcp-heading { margin: 8px 0 4px; font-weight: 600; color: var(--pmcp-text); }
-h2.pmcp-heading { font-size: 17px; }
-h3.pmcp-heading { font-size: 15px; }
-h4.pmcp-heading { font-size: 14px; }
+.pmcp-heading, .pmcp-bubble h1, .pmcp-bubble h2, .pmcp-bubble h3, .pmcp-bubble h4, .pmcp-bubble h5, .pmcp-bubble h6 { margin: 8px 0 4px; font-weight: 600; color: inherit; }
+h2.pmcp-heading, .pmcp-bubble h2 { font-size: 17px; }
+h3.pmcp-heading, .pmcp-bubble h3 { font-size: 15px; }
+h4.pmcp-heading, .pmcp-bubble h4 { font-size: 14px; }
 
 /* ---- Lists ---- */
-.pmcp-list { margin: 6px 0; padding-left: 20px; }
-.pmcp-list-item { margin: 2px 0; color: var(--pmcp-text); }
+.pmcp-list, .pmcp-bubble ol, .pmcp-bubble ul { margin: 6px 0; padding-left: 26px; }
+.pmcp-list-item, .pmcp-bubble li { margin: 2px 0; color: inherit; }
 
 /* ---- Tool Card ---- */
 .pmcp-tool-card {
@@ -672,9 +677,9 @@ h4.pmcp-heading { font-size: 14px; }
 .pmcp-resource-option {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 8px;
     width: 100%;
-    padding: 10px 12px;
+    padding: 6px 10px;
     border-radius: var(--pmcp-radius-sm);
     border: 1px solid var(--pmcp-border-light);
     background: var(--pmcp-bg-glass);
