@@ -25,7 +25,7 @@ describe('mcp-openai helpers', () => {
         ]);
     });
 
-    it('converts conversation messages into OpenAI chat messages', () => {
+    it('converts conversation messages into OpenAI chat messages (excludes tool messages)', () => {
         const messages = toOpenAiConversationMessages([
             { role: 'system', content: 'hidden context', hidden: true },
             { role: 'user', content: 'hello' },
@@ -33,11 +33,11 @@ describe('mcp-openai helpers', () => {
             { role: 'tool', content: '{"ok":true}', toolCallId: 'call_1' },
         ] as any);
 
+        // tool messages are excluded — they are ephemeral to a single turn
         expect(messages).toEqual([
             { role: 'system', content: 'hidden context' },
             { role: 'user', content: 'hello' },
             { role: 'assistant', content: 'hi' },
-            { role: 'tool', content: '{"ok":true}', tool_call_id: 'call_1' },
         ]);
     });
 });

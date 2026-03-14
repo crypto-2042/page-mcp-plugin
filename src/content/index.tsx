@@ -151,8 +151,6 @@ const ChatWidget = () => {
         model: settings.model,
         mcpClient,
         tools: tools as Array<WithSource<ToolInfo>>,
-        prompts: prompts as Array<WithSource<PromptInfo>>,
-        resources: resources as Array<WithSource<ResourceInfo>>,
         buildExecutionCatalog,
         buildOpenAiToolsFromCatalog,
         toOpenAiMessages: (msgs) => toOpenAiConversationMessages(msgs) as OpenAIChatMessage[],
@@ -367,9 +365,6 @@ const ChatWidget = () => {
                             {filterRenderableMessages(activeConv?.messages ?? []).map((m, i) => {
                                 if (m.role === 'tool' && m.toolCalls?.[0]) {
                                     const call = m.toolCalls[0];
-                                    
-                                    const isResourceOrPrompt = call.name.startsWith('resource__') || call.name.startsWith('prompt__') || call.name.startsWith('remote_resource__') || call.name.startsWith('remote_prompt__');
-                                    if (isResourceOrPrompt) return null;
 
                                     const messageId = m.id || String(i);
                                     const expanded = !!expandedToolDetails[messageId];

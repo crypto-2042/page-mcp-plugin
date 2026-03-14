@@ -5,7 +5,7 @@ import type {
     OpenAIChatCompletionResponse,
     OpenAIChatMessage,
 } from './mcp-openai.js';
-import type { AnthropicMcpTool, AnthropicMcpPrompt, AnthropicMcpResource } from '@page-mcp/protocol';
+import type { AnthropicMcpTool } from '@page-mcp/protocol';
 import type { PageMcpClient } from '@page-mcp/core';
 import { runMcpConversationTurn } from './mcp-conversation-turn.js';
 
@@ -16,15 +16,11 @@ type SourceTagged = {
 
 export function createMcpChatRuntime(params: {
     model: string;
-    mcpClient: Pick<PageMcpClient, 'callTool' | 'getPrompt' | 'readResource'> | null;
+    mcpClient: Pick<PageMcpClient, 'callTool'> | null;
     tools: Array<AnthropicMcpTool & SourceTagged>;
-    prompts: Array<AnthropicMcpPrompt & SourceTagged>;
-    resources: Array<AnthropicMcpResource & SourceTagged>;
     buildExecutionCatalog: (params: {
-        mcpClient: Pick<PageMcpClient, 'callTool' | 'getPrompt' | 'readResource'> | null;
+        mcpClient: Pick<PageMcpClient, 'callTool'> | null;
         tools: Array<AnthropicMcpTool & SourceTagged>;
-        prompts: Array<AnthropicMcpPrompt & SourceTagged>;
-        resources: Array<AnthropicMcpResource & SourceTagged>;
     }) => ExecutableTool[];
     buildOpenAiToolsFromCatalog: (tools: ExecutableTool[]) => OpenAiToolDefinition[];
     toOpenAiMessages: (messages: ChatMessage[]) => OpenAIChatMessage[];
@@ -45,8 +41,6 @@ export function createMcpChatRuntime(params: {
             const executableTools = params.buildExecutionCatalog({
                 mcpClient: params.mcpClient,
                 tools: params.tools,
-                prompts: params.prompts,
-                resources: params.resources,
             });
 
             return runConversation({

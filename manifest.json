@@ -6,7 +6,6 @@
     "description": "__MSG_extensionDesc__",
     "permissions": [
         "storage",
-        "activeTab",
         "tabs"
     ],
     "background": {
@@ -34,9 +33,12 @@
             "world": "MAIN"
         }
     ],
-    "options_page": "options.html",
+    "options_ui": {
+        "page": "options.html",
+        "open_in_tab": true
+    },
     "action": {
-        "default_title": "Page MCP Settings",
+        "default_title": "__MSG_extensionName__",
         "default_popup": "popup.html",
         "default_icon": {
             "16": "assets/icon-16.png",
@@ -50,6 +52,9 @@
         "32": "assets/icon-32.png",
         "48": "assets/icon-48.png",
         "128": "assets/icon-128.png"
+    },
+    "content_security_policy": {
+        "extension_pages": "script-src 'self'; object-src 'self'"
     },
     "externally_connectable": {
         "matches": [

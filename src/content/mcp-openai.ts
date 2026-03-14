@@ -51,20 +51,16 @@ export function buildOpenAiToolsFromCatalog(catalog: ExecutableTool[]) {
 }
 
 export function toOpenAiConversationMessages(messages: ChatMessage[]): OpenAIChatMessage[] {
+    // Note: 'tool' role messages are excluded here intentionally.
+    // Tool call rounds are handled within a single turn via workingMessages
+    // in mcp-conversation-turn.ts. The assistant message with tool_calls is
+    // NOT persisted to conversation history, so replaying orphaned tool
+    // messages in subsequent turns causes API errors like
+    // "No tool call found for function call output".
     return messages
-        .filter((message) => message.role === 'user' || message.role === 'assistant' || message.role === 'system' || message.role === 'tool')
-        .flatMap((message): OpenAIChatMessage[] => {
-            if (message.role === 'tool') {
-                if (!message.toolCallId) return [];
-                return [{
-                    role: 'tool',
-                    content: message.content,
-                    tool_call_id: message.toolCallId,
-                }];
-            }
-            return [{
-                role: message.role,
-                content: message.content,
-            }];
-        });
+        .filter((message) => message.role === 'user' || message.role === 'assistant' || message.role === 'system')
+        .map((message): OpenAIChatMessage => ({
+            role: message.role as 'user' | 'assistant' | 'system',
+            content: message.content,
+        }));
 }

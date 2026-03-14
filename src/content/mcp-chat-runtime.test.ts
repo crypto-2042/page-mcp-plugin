@@ -24,8 +24,6 @@ describe('createMcpChatRuntime', () => {
             model: 'gpt-4o',
             mcpClient: {} as any,
             tools: [] as any,
-            prompts: [] as any,
-            resources: [] as any,
             buildExecutionCatalog,
             buildOpenAiToolsFromCatalog,
             toOpenAiMessages: (messages) => messages as any,

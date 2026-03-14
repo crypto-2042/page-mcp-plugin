@@ -42,7 +42,7 @@ describe('runMcpConversationTurn', () => {
                 { id: 'user-1', role: 'user', content: 'read title', timestamp: 1 },
             ],
             buildExecutableTools: () => [{
-                openAiName: 'tool__read_title',
+                openAiName: 'read_title',
                 displayName: 'read_title',
                 description: 'Read title',
                 parameters: { type: 'object', properties: {} },
@@ -52,7 +52,7 @@ describe('runMcpConversationTurn', () => {
             buildOpenAiTools: () => [{
                 type: 'function' as const,
                 function: {
-                    name: 'tool__read_title',
+                    name: 'read_title',
                     description: 'Read title',
                     parameters: { type: 'object', properties: {} },
                 },
@@ -69,7 +69,7 @@ describe('runMcpConversationTurn', () => {
                                 id: 'call_1',
                                 type: 'function',
                                 function: {
-                                    name: 'tool__read_title',
+                                    name: 'read_title',
                                     arguments: '{}',
                                 },
                             }],
