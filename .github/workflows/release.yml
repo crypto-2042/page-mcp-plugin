@@ -1,0 +1,44 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build extension
+        run: pnpm run build
+
+      - name: Zip extension
+        run: |
+          cd dist
+          zip -r ../page-mcp-plugin-${{ github.ref_name }}.zip .
+          
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: page-mcp-plugin-${{ github.ref_name }}.zip
+          generate_release_notes: true
