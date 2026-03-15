@@ -6,6 +6,8 @@
 // (isolated world) and the page's PageMcpHost instances.
 // ============================================================
 
+import Sval from 'sval';
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 interface BridgeWindow extends Window {
@@ -112,6 +114,52 @@ interface BridgeWindow extends Window {
             }
         }, 500);
     }
+
+    // ----------------------------------------------------------------
+    // Remote Tool Execution (independent of native Host)
+    //
+    // Listens for `tool:execute` messages from the content script,
+    // evaluates the tool's execute string in the MAIN world, and
+    // returns the result. This allows remote-installed tools to run
+    // JavaScript in the page context (e.g. DOM operations).
+    //
+    // Execute string format: `(args) => { ... return result; }`
+    // ----------------------------------------------------------------
+    window.addEventListener('message', function (event: MessageEvent) {
+        const data = event.data;
+        if (!data || data.channel !== BRIDGE_CHANNEL || data.type !== 'tool:execute') return;
+
+        const { id, executeStr, args } = data.payload || {};
+        if (!id || typeof executeStr !== 'string') return;
+
+        (async function () {
+            try {
+                // Compile the execute string into a callable function.
+                // Expected format: `(args) => { ... }` or `async (args) => { ... }`
+                
+                // Use sval AST interpreter to evaluate the string safely bypassing CSP
+                const interpreter = new Sval({ sandBox: false, ecmaVer: 2019 });
+                interpreter.import('args', args || {});
+                interpreter.run(`
+                    const __fn = (${executeStr});
+                    exports.res = __fn(args);
+                `);
+                
+                const result = await interpreter.exports.res;
+                window.postMessage({
+                    channel: BRIDGE_CHANNEL,
+                    type: 'tool:execute:result',
+                    payload: { id, result }
+                }, '*');
+            } catch (err: any) {
+                window.postMessage({
+                    channel: BRIDGE_CHANNEL,
+                    type: 'tool:execute:result',
+                    payload: { id, error: err.message || String(err) }
+                }, '*');
+            }
+        })();
+    });
 
     console.log('[Page MCP Bridge] Bridge script loaded, waiting for host...');
 })();

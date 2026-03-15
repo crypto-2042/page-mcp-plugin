@@ -116,4 +116,71 @@ describe('runMcpConversationTurn', () => {
 
         expect(persisted.at(-1)?.at(-1)?.content).toBe('**Error:** proxy failed');
     });
+
+    it('blocks remote tool execution when confirmation is denied', async () => {
+        const updates: ChatMessage[][] = [];
+        const execute = vi.fn(async () => ({ ok: true }));
+        const confirmRemoteTool = vi.fn(async () => false);
+
+        await runMcpConversationTurn({
+            conversationMessages: [
+                { id: 'user-1', role: 'user', content: 'remote tool', timestamp: 1 },
+            ],
+            buildExecutableTools: () => [{
+                openAiName: 'remote_tool',
+                displayName: 'remote_tool',
+                description: 'Remote tool',
+                parameters: { type: 'object', properties: {} },
+                execute,
+                sourceType: 'remote',
+                sourceLabel: 'remote:market',
+                sourceRepositoryId: 'repo-1',
+            }],
+            toOpenAiMessages: () => [{ role: 'user', content: 'remote tool' }],
+            buildOpenAiTools: () => [{
+                type: 'function' as const,
+                function: {
+                    name: 'remote_tool',
+                    description: 'Remote tool',
+                    parameters: { type: 'object', properties: {} },
+                },
+            }],
+            formatToolResult: (result) => JSON.stringify(result ?? null),
+            callCompletions: vi
+                .fn()
+                .mockResolvedValueOnce({
+                    choices: [{
+                        message: {
+                            role: 'assistant' as const,
+                            content: '',
+                            tool_calls: [{
+                                id: 'call_1',
+                                type: 'function',
+                                function: {
+                                    name: 'remote_tool',
+                                    arguments: '{}',
+                                },
+                            }],
+                        },
+                    }],
+                })
+                .mockResolvedValueOnce({
+                    choices: [{ message: { role: 'assistant' as const, content: 'done' } }],
+                }),
+            streamCompletion: async (_messages, onDelta) => {
+                onDelta('done');
+            },
+            persistConversation: async () => {},
+            updateConversation: (messages) => {
+                updates.push(messages);
+            },
+            confirmRemoteTool,
+        });
+
+        expect(confirmRemoteTool).toHaveBeenCalled();
+        expect(execute).not.toHaveBeenCalled();
+        const toolMessage = updates.flat().find((message) => message.role === 'tool');
+        expect(toolMessage?.toolCalls?.[0]?.status).toBe('error');
+        expect(toolMessage?.toolCalls?.[0]?.error).toBe('User canceled');
+    });
 });

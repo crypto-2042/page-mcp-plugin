@@ -4,8 +4,9 @@ import {
     buildRepositoryPayloadFromForm,
     getEmptyFormState,
     parseRepositoryToFormState,
-    type McpItemForm,
+    type PromptForm,
     type SkillItemForm,
+    type ToolForm,
 } from './mcp-skills-form.js';
 
 describe('mcp skills local form mapping', () => {
@@ -13,7 +14,7 @@ describe('mcp skills local form mapping', () => {
         const form = getEmptyFormState();
         form.repositoryName = 'Local Repo';
         form.siteDomain = 'Shop.Example.com';
-        form.tools = [{ id: 't1', kind: 'tool', name: 'toolA', description: 'd', pathPattern: '', execute: 'return 1;', prompt: '', content: '' }];
+        form.tools = [{ id: 't1', name: 'toolA', description: 'd', path: '', execute: 'return 1;' }];
 
         const payload = buildRepositoryPayloadFromForm(form, null, 100, () => 'uuid-1');
 
@@ -25,8 +26,8 @@ describe('mcp skills local form mapping', () => {
         expect(payload.siteDomain).toBe('shop.example.com');
         expect(payload.mcp.tools).toHaveLength(1);
         expect(payload.mcp.tools[0]?.name).toBe('toolA');
-        expect(payload.installSnapshot.snapshot.mcp).toHaveLength(1);
-        expect(payload.installSnapshot.snapshot.mcp[0]?.pathPattern).toBe('.*');
+        expect(payload.installSnapshot.snapshot.mcp.tools).toHaveLength(1);
+        expect((payload.installSnapshot.snapshot.mcp.tools[0] as any)?.path).toBe('.*');
     });
 
     it('keeps existing repository identity when editing', () => {
@@ -65,7 +66,7 @@ describe('mcp skills local form mapping', () => {
                     isLatest: true,
                     createdAt: '2026-01-01T00:00:00.000Z',
                 },
-                snapshot: { mcp: [], skills: [] },
+                snapshot: { mcp: { tools: [], prompts: [], resources: [] }, skills: [] },
                 integrity: { algorithm: 'manual', digest: 'manual' },
             },
             enabled: true,
@@ -95,9 +96,9 @@ describe('mcp skills local form mapping', () => {
             marketOrigin: 'local://mcp-skills',
             marketDetailUrl: '',
             mcp: {
-                tools: [{ name: 'tool-x', description: 'd1' }],
-                prompts: [{ name: 'prompt-x', description: 'd2' }],
-                resources: [{ uri: 'page://resource-x', name: 'resource-x', description: 'd3' }],
+                tools: [{ name: 'tool-x', description: 'd1', execute: '() => 1', path: '^/x$' }],
+                prompts: [{ name: 'prompt-x', description: 'd2', messages: [{ role: 'user', content: { type: 'text', text: 'hello' } }], path: '^/p$' }],
+                resources: [{ uri: 'page://resource-x', name: 'resource-x', description: 'd3', mimeType: 'text/plain', path: '^/r$' }],
             },
             installSnapshot: {
                 repository: {
@@ -121,9 +122,9 @@ describe('mcp skills local form mapping', () => {
                     createdAt: '2026-01-01T00:00:00.000Z',
                 },
                 snapshot: {
-                    mcp: [],
+                    mcp: { tools: [], prompts: [], resources: [] },
                     skills: [
-                        { name: 'S', description: 'sd', version: 'local', skillMd: '# S', run: 'return {}', pathPattern: '^/s$' },
+                        { name: 'S', description: 'sd', version: 'local', skillMd: '# S', run: 'return {}', path: '^/s$' },
                     ],
                 },
                 integrity: { algorithm: 'manual', digest: 'manual' },
@@ -141,7 +142,22 @@ describe('mcp skills local form mapping', () => {
         expect(form.prompts).toHaveLength(1);
         expect(form.resources).toHaveLength(1);
         expect(form.skills).toHaveLength(1);
-        expect((form.tools[0] as McpItemForm).name).toBe('tool-x');
+        expect((form.tools[0] as ToolForm).name).toBe('tool-x');
+        expect((form.tools[0] as ToolForm).execute).toBe('() => 1');
+        expect((form.prompts[0] as PromptForm).prompt).toBe('hello');
+        expect(form.resources[0]?.uri).toBe('page://resource-x');
         expect((form.skills[0] as SkillItemForm).skillMd).toBe('# S');
+    });
+
+    it('serializes prompt form into messages', () => {
+        const form = getEmptyFormState();
+        form.repositoryName = 'Local Repo';
+        form.siteDomain = 'example.com';
+        form.prompts = [{ id: 'p1', name: 'promptA', description: '', path: '.*', prompt: 'hi' }];
+
+        const payload = buildRepositoryPayloadFromForm(form, null, 100, () => 'uuid-2');
+
+        expect(payload.mcp.prompts).toHaveLength(1);
+        expect((payload.mcp.prompts[0] as any).messages[0].content.text).toBe('hi');
     });
 });

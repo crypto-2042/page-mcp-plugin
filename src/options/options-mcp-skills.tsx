@@ -6,23 +6,42 @@ import {
     buildRepositoryPayloadFromForm,
     getEmptyFormState,
     parseRepositoryToFormState,
-    type McpItemForm,
-    type McpKind,
     type McpSkillsFormState,
+    type PromptForm,
     type SkillItemForm,
+    type ToolForm,
+    type ResourceForm,
 } from './mcp-skills-form.js';
 import './styles.css';
 
-function newMcpRow(kind: McpKind): McpItemForm {
+function newToolRow(): ToolForm {
     return {
-        id: `${kind}_${Math.random().toString(36).slice(2, 8)}`,
-        kind,
+        id: `tool_${Math.random().toString(36).slice(2, 8)}`,
         name: '',
         description: '',
-        pathPattern: '.*',
+        path: '.*',
         execute: '',
+    };
+}
+
+function newPromptRow(): PromptForm {
+    return {
+        id: `prompt_${Math.random().toString(36).slice(2, 8)}`,
+        name: '',
+        description: '',
+        path: '.*',
         prompt: '',
-        content: '',
+    };
+}
+
+function newResourceRow(): ResourceForm {
+    return {
+        id: `resource_${Math.random().toString(36).slice(2, 8)}`,
+        name: '',
+        description: '',
+        path: '.*',
+        uri: 'page://selector/',
+        mimeType: 'application/text',
     };
 }
 
@@ -31,18 +50,26 @@ function newSkillRow(): SkillItemForm {
         id: `skill_${Math.random().toString(36).slice(2, 8)}`,
         name: '',
         description: '',
-        pathPattern: '.*',
+        path: '.*',
         skillMd: '',
         run: '',
     };
 }
 
-function rowHasExtraContent(item: McpItemForm): boolean {
-    return !!(item.description.trim() || item.pathPattern.trim() || item.execute.trim() || item.prompt.trim() || item.content.trim());
+function toolHasExtraContent(item: ToolForm): boolean {
+    return !!(item.description.trim() || item.path.trim() || item.execute.trim());
+}
+
+function promptHasExtraContent(item: PromptForm): boolean {
+    return !!(item.description.trim() || item.path.trim() || item.prompt.trim());
+}
+
+function resourceHasExtraContent(item: ResourceForm): boolean {
+    return !!(item.description.trim() || item.path.trim() || item.uri.trim() || item.mimeType.trim());
 }
 
 function skillHasExtraContent(item: SkillItemForm): boolean {
-    return !!(item.description.trim() || item.pathPattern.trim() || item.skillMd.trim() || item.run.trim());
+    return !!(item.description.trim() || item.path.trim() || item.skillMd.trim() || item.run.trim());
 }
 
 // Modal component overlay
@@ -76,7 +103,9 @@ const App: React.FC = () => {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
 
-    const [mcpModalItem, setMcpModalItem] = useState<McpItemForm | null>(null);
+    const [toolModalItem, setToolModalItem] = useState<ToolForm | null>(null);
+    const [promptModalItem, setPromptModalItem] = useState<PromptForm | null>(null);
+    const [resourceModalItem, setResourceModalItem] = useState<ResourceForm | null>(null);
     const [skillModalItem, setSkillModalItem] = useState<SkillItemForm | null>(null);
 
     const [settings, setSettings] = useState<PluginSettings>(DEFAULT_SETTINGS);
@@ -176,9 +205,19 @@ const App: React.FC = () => {
         if (!form.repositoryName.trim()) return 'Repository name is required.';
         if (!form.siteDomain.trim()) return 'Site domain is required.';
 
-        for (const item of [...form.tools, ...form.prompts, ...form.resources]) {
-            if (!item.name.trim() && rowHasExtraContent(item)) {
-                return 'Each MCP item with content must have a name.';
+        for (const item of form.tools) {
+            if (!item.name.trim() && toolHasExtraContent(item)) {
+                return 'Each tool with content must have a name.';
+            }
+        }
+        for (const item of form.prompts) {
+            if (!item.name.trim() && promptHasExtraContent(item)) {
+                return 'Each prompt with content must have a name.';
+            }
+        }
+        for (const item of form.resources) {
+            if (!item.name.trim() && resourceHasExtraContent(item)) {
+                return 'Each resource with content must have a name.';
             }
         }
 
@@ -219,33 +258,69 @@ const App: React.FC = () => {
         }
     };
 
-    // Derived full list
-    const allMcpItems = [...form.tools, ...form.prompts, ...form.resources].filter(item => item.name || rowHasExtraContent(item));
+    const toolItems = form.tools.filter((item) => item.name || toolHasExtraContent(item));
+    const promptItems = form.prompts.filter((item) => item.name || promptHasExtraContent(item));
+    const resourceItems = form.resources.filter((item) => item.name || resourceHasExtraContent(item));
     const allSkillItems = form.skills.filter(item => item.name || skillHasExtraContent(item));
 
-    const removeMcp = (id: string, kind: McpKind) => {
-        const key = kind === 'tool' ? 'tools' : kind === 'prompt' ? 'prompts' : 'resources';
-        setField(key, form[key].filter(i => i.id !== id));
+    const removeTool = (id: string) => {
+        setField('tools', form.tools.filter(i => i.id !== id));
     };
 
-    const saveMcpModal = () => {
-        if (!mcpModalItem) return;
-        if (!mcpModalItem.name.trim()) return alert('Name is required');
+    const removePrompt = (id: string) => {
+        setField('prompts', form.prompts.filter(i => i.id !== id));
+    };
 
-        const { id, kind } = mcpModalItem;
-        const key = kind === 'tool' ? 'tools' : kind === 'prompt' ? 'prompts' : 'resources';
+    const removeResource = (id: string) => {
+        setField('resources', form.resources.filter(i => i.id !== id));
+    };
 
-        // Remove from all in case kind changed
-        const nextTools = form.tools.filter(i => i.id !== id);
-        const nextPrompts = form.prompts.filter(i => i.id !== id);
-        const nextResources = form.resources.filter(i => i.id !== id);
+    const saveToolModal = () => {
+        if (!toolModalItem) return;
+        if (!toolModalItem.name.trim()) return alert('Name is required');
 
-        if (kind === 'tool') nextTools.push(mcpModalItem);
-        if (kind === 'prompt') nextPrompts.push(mcpModalItem);
-        if (kind === 'resource') nextResources.push(mcpModalItem);
+        const { id } = toolModalItem;
+        const index = form.tools.findIndex(i => i.id === id);
+        if (index >= 0) {
+            const next = [...form.tools];
+            next[index] = toolModalItem;
+            setField('tools', next);
+        } else {
+            setField('tools', [...form.tools, toolModalItem]);
+        }
+        setToolModalItem(null);
+    };
 
-        setForm(prev => ({ ...prev, tools: nextTools, prompts: nextPrompts, resources: nextResources }));
-        setMcpModalItem(null);
+    const savePromptModal = () => {
+        if (!promptModalItem) return;
+        if (!promptModalItem.name.trim()) return alert('Name is required');
+
+        const { id } = promptModalItem;
+        const index = form.prompts.findIndex(i => i.id === id);
+        if (index >= 0) {
+            const next = [...form.prompts];
+            next[index] = promptModalItem;
+            setField('prompts', next);
+        } else {
+            setField('prompts', [...form.prompts, promptModalItem]);
+        }
+        setPromptModalItem(null);
+    };
+
+    const saveResourceModal = () => {
+        if (!resourceModalItem) return;
+        if (!resourceModalItem.name.trim()) return alert('Name is required');
+
+        const { id } = resourceModalItem;
+        const index = form.resources.findIndex(i => i.id === id);
+        if (index >= 0) {
+            const next = [...form.resources];
+            next[index] = resourceModalItem;
+            setField('resources', next);
+        } else {
+            setField('resources', [...form.resources, resourceModalItem]);
+        }
+        setResourceModalItem(null);
     };
 
     const removeSkill = (id: string) => {
@@ -305,24 +380,77 @@ const App: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* MCP Items List */}
+                        {/* Tools */}
                         <div className="glass-card">
                             <div className="card-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <span className="material-symbols-outlined">construction</span><span>{t('mcpItemsTitle', 'MCP Items')}</span>
+                                    <span className="material-symbols-outlined">build</span><span>Tools</span>
                                 </div>
-                                <button className="btn btn-outline" style={{ padding: '4px 12px', fontSize: 13 }} onClick={() => setMcpModalItem(newMcpRow('tool'))}>+ {t('addMcpBtn', 'Add MCP')}</button>
+                                <button className="btn btn-outline" style={{ padding: '4px 12px', fontSize: 13 }} onClick={() => setToolModalItem(newToolRow())}>+ Add tool</button>
                             </div>
-                            {allMcpItems.length === 0 ? (
-                                <p className="card-desc" style={{ marginTop: 12 }}>{t('noMcpItems', 'No MCP items yet.')}</p>
+                            {toolItems.length === 0 ? (
+                                <p className="card-desc" style={{ marginTop: 12 }}>No tools yet.</p>
                             ) : (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
-                                    {allMcpItems.map((item, idx) => (
-                                        <div key={item.id} className="list-item-card" onClick={() => setMcpModalItem({ ...item })} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', border: '1px solid var(--s-border)', borderRadius: 8, background: 'var(--s-glass-card)', cursor: 'pointer', transition: 'all 0.2s ease', borderBottom: idx !== allMcpItems.length - 1 ? '1px solid var(--s-border)' : '1px solid var(--s-border)' }}>
+                                    {toolItems.map((item) => (
+                                        <div key={item.id} className="list-item-card" onClick={() => setToolModalItem({ ...item })} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', border: '1px solid var(--s-border)', borderRadius: 8, background: 'var(--s-glass-card)', cursor: 'pointer', transition: 'all 0.2s ease' }}>
                                             <div>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                                     <strong style={{ color: 'var(--s-text)' }}>{item.name || '(unnamed)'}</strong>
-                                                    <span style={{ fontSize: 12, padding: '2px 6px', borderRadius: 4, background: 'var(--s-accent-bg)', color: 'var(--s-accent)', border: '1px solid var(--s-border-light)' }}>{item.kind.toUpperCase()}</span>
+                                                </div>
+                                                <div style={{ fontSize: 13, color: 'var(--s-text-secondary)', marginTop: 4 }}>{item.description || t('noDesc', 'No description')}</div>
+                                            </div>
+                                            <span className="material-symbols-outlined" style={{ color: 'var(--s-text-muted)' }}>chevron_right</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Prompts */}
+                        <div className="glass-card" style={{ marginTop: 24 }}>
+                            <div className="card-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <span className="material-symbols-outlined">chat</span><span>Prompts</span>
+                                </div>
+                                <button className="btn btn-outline" style={{ padding: '4px 12px', fontSize: 13 }} onClick={() => setPromptModalItem(newPromptRow())}>+ Add prompt</button>
+                            </div>
+                            {promptItems.length === 0 ? (
+                                <p className="card-desc" style={{ marginTop: 12 }}>No prompts yet.</p>
+                            ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
+                                    {promptItems.map((item) => (
+                                        <div key={item.id} className="list-item-card" onClick={() => setPromptModalItem({ ...item })} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', border: '1px solid var(--s-border)', borderRadius: 8, background: 'var(--s-glass-card)', cursor: 'pointer', transition: 'all 0.2s ease' }}>
+                                            <div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                    <strong style={{ color: 'var(--s-text)' }}>{item.name || '(unnamed)'}</strong>
+                                                </div>
+                                                <div style={{ fontSize: 13, color: 'var(--s-text-secondary)', marginTop: 4 }}>{item.description || t('noDesc', 'No description')}</div>
+                                            </div>
+                                            <span className="material-symbols-outlined" style={{ color: 'var(--s-text-muted)' }}>chevron_right</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Resources */}
+                        <div className="glass-card" style={{ marginTop: 24 }}>
+                            <div className="card-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <span className="material-symbols-outlined">inventory_2</span><span>Resources</span>
+                                </div>
+                                <button className="btn btn-outline" style={{ padding: '4px 12px', fontSize: 13 }} onClick={() => setResourceModalItem(newResourceRow())}>+ Add resource</button>
+                            </div>
+                            {resourceItems.length === 0 ? (
+                                <p className="card-desc" style={{ marginTop: 12 }}>No resources yet.</p>
+                            ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
+                                    {resourceItems.map((item) => (
+                                        <div key={item.id} className="list-item-card" onClick={() => setResourceModalItem({ ...item })} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', border: '1px solid var(--s-border)', borderRadius: 8, background: 'var(--s-glass-card)', cursor: 'pointer', transition: 'all 0.2s ease' }}>
+                                            <div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                    <strong style={{ color: 'var(--s-text)' }}>{item.name || '(unnamed)'}</strong>
                                                 </div>
                                                 <div style={{ fontSize: 13, color: 'var(--s-text-secondary)', marginTop: 4 }}>{item.description || t('noDesc', 'No description')}</div>
                                             </div>
@@ -371,75 +499,118 @@ const App: React.FC = () => {
                 )}
             </main>
 
-            {/* MCP Modal */}
-            {mcpModalItem && (
-                <ModalOverlay onClose={() => setMcpModalItem(null)}>
-                    <h3 style={{ margin: '0 0 16px', color: 'var(--text-color)' }}>{mcpModalItem.name ? 'Edit MCP Item' : 'New MCP Item'}</h3>
+            {/* Tool Modal */}
+            {toolModalItem && (
+                <ModalOverlay onClose={() => setToolModalItem(null)}>
+                    <h3 style={{ margin: '0 0 16px', color: 'var(--text-color)' }}>{toolModalItem.name ? 'Edit Tool' : 'New Tool'}</h3>
                     <div style={{ display: 'grid', gap: 12 }}>
                         <div className="form-group">
-                            <label className="input-label" style={{ display: 'block', marginBottom: 6, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Type</label>
-                            <select
-                                className="glass-input"
-                                value={mcpModalItem.kind}
-                                onChange={(e) => setMcpModalItem({ ...mcpModalItem, kind: e.target.value as McpKind })}
-                                style={{ appearance: 'none', cursor: 'pointer' }}
-                            >
-                                <option value="tool">Tool</option>
-                                <option value="prompt">Prompt</option>
-                                <option value="resource">Resource</option>
-                            </select>
-                        </div>
-                        <div className="form-group">
                             <label className="input-label" style={{ display: 'block', marginBottom: 6, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Name <span style={{ color: '#ef4444' }}>*</span></label>
-                            <input className="glass-input" placeholder="e.g. read_file" value={mcpModalItem.name} onChange={(e) => setMcpModalItem({ ...mcpModalItem, name: e.target.value })} />
+                            <input className="glass-input" placeholder="e.g. read_file" value={toolModalItem.name} onChange={(e) => setToolModalItem({ ...toolModalItem, name: e.target.value })} />
                         </div>
                         <div className="form-group">
                             <label className="input-label" style={{ display: 'block', marginBottom: 6, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Description</label>
-                            <input className="glass-input" placeholder="What does this do?" value={mcpModalItem.description} onChange={(e) => setMcpModalItem({ ...mcpModalItem, description: e.target.value })} />
+                            <input className="glass-input" placeholder="What does this do?" value={toolModalItem.description} onChange={(e) => setToolModalItem({ ...toolModalItem, description: e.target.value })} />
                         </div>
                         <div className="form-group">
                             <label className="input-label" style={{ display: 'block', marginBottom: 6, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Path Pattern (RegExp)</label>
-                            <input className="glass-input" placeholder="default: .*" value={mcpModalItem.pathPattern} onChange={(e) => setMcpModalItem({ ...mcpModalItem, pathPattern: e.target.value })} />
+                            <input className="glass-input" placeholder="default: .*" value={toolModalItem.path} onChange={(e) => setToolModalItem({ ...toolModalItem, path: e.target.value })} />
+                        </div>
+                        <div className="form-group">
+                            <label className="input-label" style={{ display: 'block', marginBottom: 6, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Execute Script (JS)</label>
+                            <textarea className="glass-input" placeholder="() => { ... }" value={toolModalItem.execute} onChange={(e) => setToolModalItem({ ...toolModalItem, execute: e.target.value })} style={{ minHeight: 120, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }} />
                         </div>
 
-                        {mcpModalItem.kind === 'tool' && (
-                            <div className="form-group">
-                                <label className="input-label" style={{ display: 'block', marginBottom: 6, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Execute Script (JS)</label>
-                                <textarea className="glass-input" placeholder="() => { ... }" value={mcpModalItem.execute} onChange={(e) => setMcpModalItem({ ...mcpModalItem, execute: e.target.value })} style={{ minHeight: 120, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }} />
-                            </div>
-                        )}
-                        {mcpModalItem.kind === 'prompt' && (
-                            <>
-                                <div className="form-group">
-                                    <label className="input-label" style={{ display: 'block', marginBottom: 6, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Prompt Template</label>
-                                    <textarea className="glass-input" placeholder="Enter prompt text or template" value={mcpModalItem.prompt} onChange={(e) => setMcpModalItem({ ...mcpModalItem, prompt: e.target.value })} style={{ minHeight: 100 }} />
-                                </div>
-                                <div className="form-group">
-                                    <label className="input-label" style={{ display: 'block', marginBottom: 6, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Execute Script (Optional JS)</label>
-                                    <textarea className="glass-input" placeholder="Script to run before prompt" value={mcpModalItem.execute} onChange={(e) => setMcpModalItem({ ...mcpModalItem, execute: e.target.value })} style={{ minHeight: 100, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }} />
-                                </div>
-                            </>
-                        )}
-                        {mcpModalItem.kind === 'resource' && (
-                            <>
-                                <div className="form-group">
-                                    <label className="input-label" style={{ display: 'block', marginBottom: 6, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Content Template</label>
-                                    <textarea className="glass-input" placeholder="Content text or template" value={mcpModalItem.content} onChange={(e) => setMcpModalItem({ ...mcpModalItem, content: e.target.value })} style={{ minHeight: 100 }} />
-                                </div>
-                                <div className="form-group">
-                                    <label className="input-label" style={{ display: 'block', marginBottom: 6, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Execute Script (Optional JS)</label>
-                                    <textarea className="glass-input" placeholder="Script to run to fetch content" value={mcpModalItem.execute} onChange={(e) => setMcpModalItem({ ...mcpModalItem, execute: e.target.value })} style={{ minHeight: 100, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }} />
-                                </div>
-                            </>
-                        )}
-
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 }}>
-                            {editing && mcpModalItem.id && [...form.tools, ...form.prompts, ...form.resources].some(i => i.id === mcpModalItem.id) ? (
-                                <button className="btn btn-danger" onClick={() => { removeMcp(mcpModalItem.id, mcpModalItem.kind); setMcpModalItem(null); }}>{t('deleteBtn', 'Delete')}</button>
+                            {editing && toolModalItem.id && form.tools.some(i => i.id === toolModalItem.id) ? (
+                                <button className="btn btn-danger" onClick={() => { removeTool(toolModalItem.id); setToolModalItem(null); }}>{t('deleteBtn', 'Delete')}</button>
                             ) : <div />}
                             <div style={{ display: 'flex', gap: 10 }}>
-                                <button className="btn btn-ghost" onClick={() => setMcpModalItem(null)}>{t('cancelBtn', 'Cancel')}</button>
-                                <button className="btn btn-primary" onClick={saveMcpModal}>{t('confirmBtn', 'Confirm')}</button>
+                                <button className="btn btn-ghost" onClick={() => setToolModalItem(null)}>{t('cancelBtn', 'Cancel')}</button>
+                                <button className="btn btn-primary" onClick={saveToolModal}>{t('confirmBtn', 'Confirm')}</button>
+                            </div>
+                        </div>
+                    </div>
+                </ModalOverlay>
+            )}
+
+            {/* Prompt Modal */}
+            {promptModalItem && (
+                <ModalOverlay onClose={() => setPromptModalItem(null)}>
+                    <h3 style={{ margin: '0 0 16px', color: 'var(--text-color)' }}>{promptModalItem.name ? 'Edit Prompt' : 'New Prompt'}</h3>
+                    <div style={{ display: 'grid', gap: 12 }}>
+                        <div className="form-group">
+                            <label className="input-label" style={{ display: 'block', marginBottom: 6, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Name <span style={{ color: '#ef4444' }}>*</span></label>
+                            <input className="glass-input" placeholder="e.g. summarize_page" value={promptModalItem.name} onChange={(e) => setPromptModalItem({ ...promptModalItem, name: e.target.value })} />
+                        </div>
+                        <div className="form-group">
+                            <label className="input-label" style={{ display: 'block', marginBottom: 6, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Description</label>
+                            <input className="glass-input" placeholder="What does this do?" value={promptModalItem.description} onChange={(e) => setPromptModalItem({ ...promptModalItem, description: e.target.value })} />
+                        </div>
+                        <div className="form-group">
+                            <label className="input-label" style={{ display: 'block', marginBottom: 6, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Path Pattern (RegExp)</label>
+                            <input className="glass-input" placeholder="default: .*" value={promptModalItem.path} onChange={(e) => setPromptModalItem({ ...promptModalItem, path: e.target.value })} />
+                        </div>
+                        <div className="form-group">
+                            <label className="input-label" style={{ display: 'block', marginBottom: 6, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Prompt Template</label>
+                            <textarea className="glass-input" placeholder="Enter prompt text or template" value={promptModalItem.prompt} onChange={(e) => setPromptModalItem({ ...promptModalItem, prompt: e.target.value })} style={{ minHeight: 100 }} />
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 }}>
+                            {editing && promptModalItem.id && form.prompts.some(i => i.id === promptModalItem.id) ? (
+                                <button className="btn btn-danger" onClick={() => { removePrompt(promptModalItem.id); setPromptModalItem(null); }}>{t('deleteBtn', 'Delete')}</button>
+                            ) : <div />}
+                            <div style={{ display: 'flex', gap: 10 }}>
+                                <button className="btn btn-ghost" onClick={() => setPromptModalItem(null)}>{t('cancelBtn', 'Cancel')}</button>
+                                <button className="btn btn-primary" onClick={savePromptModal}>{t('confirmBtn', 'Confirm')}</button>
+                            </div>
+                        </div>
+                    </div>
+                </ModalOverlay>
+            )}
+
+            {/* Resource Modal */}
+            {resourceModalItem && (
+                <ModalOverlay onClose={() => setResourceModalItem(null)}>
+                    <h3 style={{ margin: '0 0 16px', color: 'var(--text-color)' }}>{resourceModalItem.name ? 'Edit Resource' : 'New Resource'}</h3>
+                    <div style={{ display: 'grid', gap: 12 }}>
+                        <div className="form-group">
+                            <label className="input-label" style={{ display: 'block', marginBottom: 6, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Name <span style={{ color: '#ef4444' }}>*</span></label>
+                            <input className="glass-input" placeholder="e.g. page_title" value={resourceModalItem.name} onChange={(e) => setResourceModalItem({ ...resourceModalItem, name: e.target.value })} />
+                        </div>
+                        <div className="form-group">
+                            <label className="input-label" style={{ display: 'block', marginBottom: 6, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Description</label>
+                            <input className="glass-input" placeholder="What does this do?" value={resourceModalItem.description} onChange={(e) => setResourceModalItem({ ...resourceModalItem, description: e.target.value })} />
+                        </div>
+                        <div className="form-group">
+                            <label className="input-label" style={{ display: 'block', marginBottom: 6, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Path Pattern (RegExp)</label>
+                            <input className="glass-input" placeholder="default: .*" value={resourceModalItem.path} onChange={(e) => setResourceModalItem({ ...resourceModalItem, path: e.target.value })} />
+                        </div>
+                        <div className="form-group">
+                            <label className="input-label" style={{ display: 'block', marginBottom: 6, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>URI</label>
+                            <input className="glass-input" placeholder="e.g. page://selector/#id or page://xpath/a" value={resourceModalItem.uri} onChange={(e) => setResourceModalItem({ ...resourceModalItem, uri: e.target.value })} />
+                        </div>
+                        <div className="form-group">
+                            <label className="input-label" style={{ display: 'block', marginBottom: 6, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>MIME Type</label>
+                            <select
+                                className="glass-input"
+                                value={resourceModalItem.mimeType}
+                                onChange={(e) => setResourceModalItem({ ...resourceModalItem, mimeType: e.target.value })}
+                                style={{ appearance: 'none', cursor: 'pointer' }}
+                            >
+                                <option value="application/json">application/json</option>
+                                <option value="application/text">application/text</option>
+                                <option value="application/html">application/html</option>
+                            </select>
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 }}>
+                            {editing && resourceModalItem.id && form.resources.some(i => i.id === resourceModalItem.id) ? (
+                                <button className="btn btn-danger" onClick={() => { removeResource(resourceModalItem.id); setResourceModalItem(null); }}>{t('deleteBtn', 'Delete')}</button>
+                            ) : <div />}
+                            <div style={{ display: 'flex', gap: 10 }}>
+                                <button className="btn btn-ghost" onClick={() => setResourceModalItem(null)}>{t('cancelBtn', 'Cancel')}</button>
+                                <button className="btn btn-primary" onClick={saveResourceModal}>{t('confirmBtn', 'Confirm')}</button>
                             </div>
                         </div>
                     </div>
@@ -461,7 +632,7 @@ const App: React.FC = () => {
                         </div>
                         <div className="form-group">
                             <label className="input-label" style={{ display: 'block', marginBottom: 6, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Path Pattern (RegExp)</label>
-                            <input className="glass-input" placeholder="default: .*" value={skillModalItem.pathPattern} onChange={(e) => setSkillModalItem({ ...skillModalItem, pathPattern: e.target.value })} />
+                            <input className="glass-input" placeholder="default: .*" value={skillModalItem.path} onChange={(e) => setSkillModalItem({ ...skillModalItem, path: e.target.value })} />
                         </div>
                         <div className="form-group">
                             <label className="input-label" style={{ display: 'block', marginBottom: 6, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Skill Markdown</label>

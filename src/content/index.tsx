@@ -12,7 +12,7 @@ import { generatePluginStyles } from './styles.js';
 import { renderMarkdown } from './markdown.js';
 import { formatToolResult } from './tool-result-format.js';
 import { buildQuickActionCandidates } from './quick-actions.js';
-import { buildExecutionCatalog } from './execution-catalog.js';
+import { buildExecutionCatalog, type ExecutableTool } from './execution-catalog.js';
 import { buildAttachedResourceMessages } from './mcp-resources.js';
 import { applyPromptShortcutMessages } from './mcp-prompt-shortcuts.js';
 import {
@@ -39,14 +39,49 @@ import { useConversationManager } from './hooks/use-conversations.js';
 import { useWidgetVisibility } from './hooks/use-widget-visibility.js';
 
 // Icons
-import { MessageSquare, X, Send, Clock, Plus, Settings as SettingsIcon, Trash2, ChevronDown, ChevronUp, Layers3 } from 'lucide-react';
+import { MessageSquare, X, Send, Clock, Plus, Settings as SettingsIcon, Trash2, ChevronDown, ChevronUp, Layers3, Square } from 'lucide-react';
 
 const currentDomain = window.location.hostname;
 
 type WithSource<T> = T & {
-    sourceType: 'native';
-    sourceLabel: 'native';
+    sourceType: 'native' | 'remote';
+    sourceLabel: string;
+    sourceRepositoryId?: string;
 };
+
+type PendingToolConfirm = {
+    toolName: string;
+    sourceLabel: string;
+    args: Record<string, unknown>;
+    resolve: (allowed: boolean) => void;
+};
+
+/** Build inline ChatMessages from a stored prompt's messages array (remote prompts). */
+function buildInlinePromptMessages(
+    messages: Array<Record<string, unknown>> | undefined
+): ChatMessage[] {
+    if (!Array.isArray(messages) || messages.length === 0) return [];
+    const timestamp = Date.now();
+    return messages
+        .filter((m: any) => {
+            const content = m?.content;
+            if (typeof content === 'string') return content.length > 0;
+            if (content && typeof content === 'object') {
+                return content.type === 'text' && typeof content.text === 'string' && content.text.length > 0;
+            }
+            return false;
+        })
+        .map((m: any, index: number) => {
+            const content = m.content;
+            const text = typeof content === 'string' ? content : (content as any).text as string;
+            return {
+                id: `msg_inline_${timestamp}_${index}`,
+                role: (m.role || 'user') as 'user' | 'assistant' | 'system',
+                content: text,
+                timestamp: timestamp + index,
+            };
+        });
+}
 
 type StreamPortMessage =
     | { type: 'CHUNK'; delta: string }
@@ -60,7 +95,7 @@ type StreamPortMessage =
 const ChatWidget = () => {
     // --- Hooks ---
     const { settings, isLoaded, t } = usePluginSettings();
-    const { mcpClient, tools, prompts, resources, hasNativeChat } = useMcpDiscovery(settings, isLoaded);
+    const { mcpClient, tools, prompts, resources, hasNativeChat, installedReposRef } = useMcpDiscovery(settings, isLoaded);
     const {
         conversations, activeConvId, activeConv, setActiveConvId,
         startNewChat, deleteConv, persistConv, upsertConversation, createConversation,
@@ -81,6 +116,15 @@ const ChatWidget = () => {
     const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const qaHovered = useRef(false);
+    const abortControllerRef = useRef<AbortController | null>(null);
+    const [pendingToolConfirm, setPendingToolConfirm] = useState<PendingToolConfirm | null>(null);
+
+    const handleStop = () => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            abortControllerRef.current = null;
+        }
+    };
 
     // --- Derived ---
     const stopPageShortcutPropagation = (e: React.KeyboardEvent) => {
@@ -113,9 +157,25 @@ const ChatWidget = () => {
         messages: OpenAIChatMessage[],
         onDelta: (delta: string) => void,
         streamTools?: OpenAiToolDefinition[],
+        signal?: AbortSignal,
     ): Promise<void> => {
         await new Promise<void>((resolve, reject) => {
             const port = chrome.runtime.connect({ name: 'PMCP_AI_STREAM' });
+            
+            const cleanup = () => {
+                port.onMessage.removeListener(onMessage as Parameters<typeof port.onMessage.addListener>[0]);
+                if (signal) signal.removeEventListener('abort', onAbort);
+            };
+
+            const onAbort = () => {
+                cleanup();
+                port.disconnect();
+                reject(new DOMException('Aborted', 'AbortError'));
+            };
+
+            if (signal?.aborted) return onAbort();
+            if (signal) signal.addEventListener('abort', onAbort);
+
             const onMessage = (msg: StreamPortMessage) => {
                 if (!msg || typeof msg !== 'object') return;
                 if (msg.type === 'CHUNK') {
@@ -124,7 +184,7 @@ const ChatWidget = () => {
                     }
                     return;
                 }
-                port.onMessage.removeListener(onMessage as Parameters<typeof port.onMessage.addListener>[0]);
+                cleanup();
                 port.disconnect();
                 if (msg.type === 'DONE') {
                     resolve();
@@ -146,6 +206,42 @@ const ChatWidget = () => {
         });
     };
 
+    const getRepoAllowWithoutConfirm = (repoId?: string): boolean => {
+        if (!repoId) return false;
+        const repo = installedReposRef.current.find((item) => item.repositoryId === repoId);
+        return !!repo?.allowWithoutConfirm;
+    };
+
+    const confirmRemoteTool = async (tool: ExecutableTool, args: Record<string, unknown>): Promise<boolean> => {
+        if (tool.sourceType !== 'remote') return true;
+        if (getRepoAllowWithoutConfirm(tool.sourceRepositoryId)) return true;
+        if (!panelOpen) setPanelOpen(true);
+        return new Promise((resolve) => {
+            setPendingToolConfirm({
+                toolName: tool.displayName,
+                sourceLabel: tool.sourceLabel || 'remote',
+                args,
+                resolve,
+            });
+        });
+    };
+
+    const resolveToolConfirm = (allowed: boolean) => {
+        const pending = pendingToolConfirm;
+        if (!pending) return;
+        pending.resolve(allowed);
+        setPendingToolConfirm(null);
+    };
+
+    const formatConfirmArgs = (args: Record<string, unknown>) => {
+        try {
+            const text = JSON.stringify(args, null, 2);
+            return text.length > 2000 ? `${text.slice(0, 2000)}...` : text;
+        } catch {
+            return String(args);
+        }
+    };
+
     // --- Chat Runtime ---
     const chatRuntime = createMcpChatRuntime({
         model: settings.model,
@@ -157,12 +253,14 @@ const ChatWidget = () => {
         formatToolResult,
         safeRuntimeMessage,
         streamCompletion,
+        confirmRemoteTool,
     });
 
-    // --- Send / Prompt Handlers ---
     const handleSend = async (text: string = inputText) => {
         if (!text.trim() || isLoading) return;
         setInputText('');
+        
+        abortControllerRef.current = new AbortController();
 
         await runChatAction({
             activeConversation: activeConv,
@@ -189,15 +287,62 @@ const ChatWidget = () => {
                         upsertConversation({ ...conversation, messages });
                     },
                     persistConversation: persistConv,
+                    signal: abortControllerRef.current?.signal,
                 });
                 return { ...conversation, messages };
             },
             persistConversation: persistConv,
         });
+        abortControllerRef.current = null;
     };
 
+    const promptsRef = useRef<WithSource<PromptInfo>[]>([]);
+    promptsRef.current = prompts as WithSource<PromptInfo>[];
+
     const handlePromptShortcut = async (promptName: string) => {
-        if (isLoading || !mcpClient) return;
+        if (isLoading) return;
+
+        // Find the prompt in the current list to detect inline messages (remote prompts)
+        const foundPrompt = promptsRef.current.find((p) => p.name === promptName) as any;
+        const inlineMessages: Array<Record<string, unknown>> | undefined =
+            foundPrompt?.messages;
+
+        // Remote prompts have inline messages — use them directly (no mcpClient needed)
+        if (inlineMessages && inlineMessages.length > 0) {
+            const builtMessages = buildInlinePromptMessages(inlineMessages);
+            if (builtMessages.length === 0) return;
+            
+            abortControllerRef.current = new AbortController();
+
+            await runChatAction({
+                activeConversation: activeConv,
+                createConversation,
+                prepareMessages: async () => builtMessages,
+                upsertConversation,
+                setActiveConversationId: setActiveConvId,
+                setLoading: setIsLoading,
+                runPreparedTurn: async (conversation) => {
+                    const messages = await chatRuntime.runPreparedTurn({
+                        conversationMessages: conversation.messages,
+                        baseConversation: conversation,
+                        updateConversation: (messages) => {
+                            upsertConversation({ ...conversation, messages });
+                        },
+                        persistConversation: persistConv,
+                        signal: abortControllerRef.current?.signal,
+                    });
+                    return { ...conversation, messages };
+                },
+                persistConversation: persistConv,
+            });
+            abortControllerRef.current = null;
+            return;
+        }
+
+        // Native prompts — use mcpClient.getPrompt()
+        if (!mcpClient) return;
+        
+        abortControllerRef.current = new AbortController();
 
         await runChatAction({
             activeConversation: activeConv,
@@ -225,11 +370,13 @@ const ChatWidget = () => {
                         upsertConversation({ ...conversation, messages });
                     },
                     persistConversation: persistConv,
+                    signal: abortControllerRef.current?.signal,
                 });
                 return { ...conversation, messages };
             },
             persistConversation: persistConv,
         });
+        abortControllerRef.current = null;
     };
 
     // --- Quick Actions ---
@@ -476,11 +623,38 @@ const ChatWidget = () => {
                                 placeholder={t('typeMessage') || 'Type a message...'}
                                 disabled={isLoading}
                             />
-                            <button className="pmcp-btn-send" onClick={() => handleSend()} disabled={!inputText.trim() || isLoading}><Send size={18} /></button>
+                            {isLoading ? (
+                                <button className="pmcp-btn-send pmcp-btn-stop" onClick={handleStop} title={t('stop') || 'Stop generation'}><Square size={18} fill="currentColor" /></button>
+                            ) : (
+                                <button className="pmcp-btn-send" onClick={() => handleSend()} disabled={!inputText.trim()}><Send size={18} /></button>
+                            )}
                         </div>
                     </div>
                 </div>
             </div>
+            {pendingToolConfirm && (
+                <div className="pmcp-confirm-backdrop" onClick={() => resolveToolConfirm(false)}>
+                    <div className="pmcp-confirm-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="pmcp-confirm-title">{t('confirmRemoteToolTitle') || '确认执行远程工具'}</div>
+                        <div className="pmcp-confirm-meta">
+                            <div><strong>{t('confirmRemoteToolName') || '工具'}:</strong> {pendingToolConfirm.toolName}</div>
+                            <div><strong>{t('confirmRemoteToolSource') || '来源'}:</strong> {pendingToolConfirm.sourceLabel}</div>
+                        </div>
+                        <div className="pmcp-confirm-args">
+                            <div className="pmcp-confirm-args-label">{t('confirmRemoteToolArgs') || '参数'}</div>
+                            <pre>{formatConfirmArgs(pendingToolConfirm.args)}</pre>
+                        </div>
+                        <div className="pmcp-confirm-actions">
+                            <button className="pmcp-btn-ghost" type="button" onClick={() => resolveToolConfirm(false)}>
+                                {t('confirmRemoteToolCancel') || '取消'}
+                            </button>
+                            <button className="pmcp-btn-primary" type="button" onClick={() => resolveToolConfirm(true)}>
+                                {t('confirmRemoteToolAllow') || '允许'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
             <style>{generatePluginStyles(settings.theme, settings.accentColor)}</style>
         </div>
     );

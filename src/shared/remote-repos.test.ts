@@ -4,7 +4,6 @@ import {
     normalizeDomain,
     normalizeInstalledRepo,
     normalizeOrigin,
-    toStoredMcpSnapshot,
     upsertInstalledRepo,
 } from './remote-repos.js';
 import type { InstalledRemoteRepository, StoredMcpSnapshot } from './types.js';
@@ -30,8 +29,24 @@ const installSnapshot = {
         isLatest: true,
         createdAt: '2026-01-01T00:00:00.000Z',
     },
-    snapshot: { mcp: [], skills: [] },
+    snapshot: { mcp: { tools: [], prompts: [], resources: [] }, skills: [] },
     integrity: { algorithm: 'sha256', digest: 'abc' },
+};
+
+const baseRepo: InstalledRemoteRepository = {
+    id: 'repo_repo-1|shop.example.com|https://market-a.example',
+    repositoryId: 'repo-1',
+    repositoryName: 'Repo One',
+    siteDomain: 'shop.example.com',
+    release: '1.0.0',
+    apiBase: 'https://api.market-a.example',
+    marketOrigin: 'https://market-a.example',
+    marketDetailUrl: 'https://market-a.example/repo/repo-1',
+    mcp: { tools: [], prompts: [], resources: [] },
+    installSnapshot: installSnapshot as any,
+    enabled: true,
+    installedAt: 1,
+    updatedAt: 1,
 };
 
 describe('remote repo model', () => {
@@ -93,19 +108,36 @@ describe('remote repo model', () => {
         expect(normalizeOrigin('https://Market.Example/abc/def?x=1')).toBe('https://market.example');
     });
 
-    it('maps legacy snapshot items into mcp buckets', () => {
-        const snapshot = toStoredMcpSnapshot([
-            { name: 'tool-a', itemType: 'tool', manifest: {}, pathPattern: '.*' },
-            { name: 'prompt-a', itemType: 'prompt', manifest: {}, pathPattern: '.*' },
-            { name: 'resource-a', itemType: 'resource', manifest: {}, pathPattern: '.*' },
-        ] as any[]);
+    it('snapshot.mcp is used directly as StoredMcpSnapshot — no conversion needed', () => {
+        const mcp: StoredMcpSnapshot = {
+            tools: [{ name: 'tool-a', description: 'Tool A' }],
+            prompts: [{ name: 'prompt-a' }],
+            resources: [{ uri: 'page://selector/a', name: 'resource-a' }],
+        };
+        const normalized = normalizeInstalledRepo({
+            id: 'repo_repo-1|example.com|https://market.example',
+            repositoryId: 'repo-1',
+            repositoryName: 'Repo One',
+            siteDomain: 'example.com',
+            release: '1.0.0',
+            apiBase: 'https://api.market.example',
+            marketOrigin: 'https://market.example',
+            marketDetailUrl: 'https://market.example/repo/repo-1',
+            installSnapshot: {
+                ...installSnapshot,
+                snapshot: { mcp, skills: [] },
+            },
+            enabled: true,
+            installedAt: 1,
+            updatedAt: 1,
+        } as unknown as InstalledRemoteRepository);
 
-        expect(snapshot.tools.map((item) => item.name)).toEqual(['tool-a']);
-        expect(snapshot.prompts.map((item) => item.name)).toEqual(['prompt-a']);
-        expect(snapshot.resources.map((item) => item.name)).toEqual(['resource-a']);
+        expect(normalized.mcp.tools[0]?.name).toBe('tool-a');
+        expect(normalized.mcp.prompts[0]?.name).toBe('prompt-a');
+        expect(normalized.mcp.resources[0]?.name).toBe('resource-a');
     });
 
-    it('hydrates missing mcp buckets from legacy install snapshot data', () => {
+    it('hydrates missing mcp buckets from install snapshot data', () => {
         const normalized = normalizeInstalledRepo({
             id: 'repo_repo-1|shop.example.com|https://market-a.example',
             repositoryId: 'repo-1',
@@ -124,5 +156,18 @@ describe('remote repo model', () => {
         expect(normalized.mcp.tools).toHaveLength(0);
         expect(normalized.mcp.prompts).toHaveLength(0);
         expect(normalized.mcp.resources).toHaveLength(0);
+    });
+
+    it('preserves allowWithoutConfirm flag', () => {
+        const normalized = normalizeInstalledRepo({
+            ...baseRepo,
+            allowWithoutConfirm: true,
+        });
+        expect(normalized.allowWithoutConfirm).toBe(true);
+    });
+
+    it('defaults allowWithoutConfirm to false when missing', () => {
+        const normalized = normalizeInstalledRepo(baseRepo);
+        expect(normalized.allowWithoutConfirm).toBe(false);
     });
 });

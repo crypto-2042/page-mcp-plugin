@@ -1,78 +1,23 @@
 import type {
     InstalledRemoteRepository,
     RemoteInstallRequest,
-    SnapshotMcpItem,
-    StoredMcpPrompt,
-    StoredMcpResource,
     StoredMcpSnapshot,
-    StoredMcpTool,
 } from './types.js';
 
 function defaultMcpSnapshot(): StoredMcpSnapshot {
     return { tools: [], prompts: [], resources: [] };
 }
 
-function toStoredTool(item: SnapshotMcpItem): StoredMcpTool {
-    const manifest = (item.manifest && typeof item.manifest === 'object')
-        ? item.manifest as Record<string, unknown>
-        : {};
-    return {
-        name: item.name,
-        description: item.description ?? undefined,
-        inputSchema: (manifest.inputSchema as Record<string, unknown> | undefined),
-        annotations: (manifest.annotations as Record<string, unknown> | undefined),
-        title: typeof manifest.title === 'string' ? manifest.title : undefined,
-    };
-}
-
-function toStoredPrompt(item: SnapshotMcpItem): StoredMcpPrompt {
-    const manifest = (item.manifest && typeof item.manifest === 'object')
-        ? item.manifest as Record<string, unknown>
-        : {};
-    return {
-        name: item.name,
-        description: item.description ?? undefined,
-        title: typeof manifest.title === 'string' ? manifest.title : undefined,
-        arguments: Array.isArray(manifest.arguments)
-            ? manifest.arguments as StoredMcpPrompt['arguments']
-            : undefined,
-        messages: Array.isArray(manifest.messages)
-            ? manifest.messages as StoredMcpPrompt['messages']
-            : undefined,
-    };
-}
-
-function toStoredResource(item: SnapshotMcpItem): StoredMcpResource {
-    const manifest = (item.manifest && typeof item.manifest === 'object')
-        ? item.manifest as Record<string, unknown>
-        : {};
-    return {
-        uri: typeof manifest.uri === 'string' ? manifest.uri : `page://legacy/${encodeURIComponent(item.name)}`,
-        name: item.name,
-        description: item.description ?? undefined,
-        mimeType: typeof manifest.mimeType === 'string' ? manifest.mimeType : undefined,
-    };
-}
-
-export function toStoredMcpSnapshot(items: SnapshotMcpItem[]): StoredMcpSnapshot {
-    const next = defaultMcpSnapshot();
-    for (const item of items) {
-        const kind = item.itemType?.toLowerCase();
-        if (kind === 'tool') next.tools.push(toStoredTool(item));
-        if (kind === 'prompt') next.prompts.push(toStoredPrompt(item));
-        if (kind === 'resource') next.resources.push(toStoredResource(item));
-    }
-    return next;
-}
-
 export function normalizeInstalledRepo(repo: InstalledRemoteRepository): InstalledRemoteRepository {
-    const snapshotItems = repo.installSnapshot?.snapshot?.mcp ?? [];
+    // snapshot.mcp is StoredMcpSnapshot — use it directly as fallback for repo.mcp
+    const snapshotMcp = repo.installSnapshot?.snapshot?.mcp;
     return {
         ...repo,
         siteDomain: normalizeDomain(repo.siteDomain),
         marketOrigin: normalizeOrigin(repo.marketOrigin),
         apiBase: normalizeApiBase(repo.apiBase),
-        mcp: repo.mcp ?? toStoredMcpSnapshot(snapshotItems),
+        mcp: repo.mcp ?? snapshotMcp ?? defaultMcpSnapshot(),
+        allowWithoutConfirm: repo.allowWithoutConfirm ?? false,
     };
 }
 

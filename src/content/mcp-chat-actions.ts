@@ -27,6 +27,8 @@ export async function runChatAction(params: {
         params.upsertConversation(conversation);
         await params.runPreparedTurn(conversation);
     } catch (error) {
+        if ((error as Error).name === 'AbortError') return;
+
         const errorMessage: ChatMessage = {
             id: generateMessageId(),
             role: 'assistant',

@@ -271,6 +271,43 @@ async function handleMessage(msg: PluginMessage, sender: chrome.runtime.MessageS
             }
             return { ok: true };
         }
+        case 'CALL_REMOTE_TOOL': {
+            const settings = await getSettings();
+            // Validate the market origin (the site that installed the repo) is in the whitelist.
+            // apiBase is the backend API host and may differ (e.g. localhost in dev).
+            let originOk = false;
+            try {
+                const marketOrigin = new URL(msg.marketOrigin).origin.toLowerCase();
+                originOk = settings.allowedMarketOrigins.some((o) => {
+                    try { return new URL(o).origin.toLowerCase() === marketOrigin; } catch { return false; }
+                });
+            } catch { /* invalid URL */ }
+            if (!originOk) {
+                return { error: `Market origin not in allowed list: ${msg.marketOrigin}` };
+            }
+            const toolUrl = `${msg.apiBase.replace(/\/+$/, '')}/repositories/${msg.repositoryId}/tools/${encodeURIComponent(msg.toolName)}/execute`;
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), PROXY_TIMEOUT_MS);
+                const response = await fetch(toolUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ args: msg.args }),
+                    signal: controller.signal,
+                }).finally(() => clearTimeout(timeoutId));
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    const message = (data as any)?.error?.message || `HTTP ${response.status}`;
+                    return { error: message };
+                }
+                return { data };
+            } catch (error) {
+                if ((error as Error)?.name === 'AbortError') {
+                    return { error: `Remote tool request timeout after ${PROXY_TIMEOUT_MS}ms` };
+                }
+                return { error: (error as Error)?.message || 'Remote tool request failed' };
+            }
+        }
         default:
             return { error: 'Unknown message type' };
     }
@@ -295,10 +332,11 @@ async function handleExternalInstall(message: unknown, sender: chrome.runtime.Me
         return check;
     }
 
-    const current = await getRemoteRepositories();
+    // Store in McpSkills storage so Options MCP/Skills tab and popup can see it
+    const current = await getMcpSkillsRepositories();
     const next = upsertInstalledRepo(current, check.payload);
     try {
-        await saveRemoteRepositories(next);
+        await saveMcpSkillsRepositories(next);
     } catch (error) {
         console.error('[Page MCP] external install save failed', error);
         throw error;

@@ -411,5 +411,29 @@
     },
     "remoteDeleteConfirmBtn": {
         "message": "确认删除"
+    },
+    "remoteAllowDirectExecTitle": {
+        "message": "允许直接执行"
+    },
+    "remoteAllowDirectExecDesc": {
+        "message": "远程工具执行无需二次确认。"
+    },
+    "confirmRemoteToolTitle": {
+        "message": "确认执行远程工具"
+    },
+    "confirmRemoteToolName": {
+        "message": "工具"
+    },
+    "confirmRemoteToolSource": {
+        "message": "来源"
+    },
+    "confirmRemoteToolArgs": {
+        "message": "参数"
+    },
+    "confirmRemoteToolCancel": {
+        "message": "取消"
+    },
+    "confirmRemoteToolAllow": {
+        "message": "允许"
     }
 }

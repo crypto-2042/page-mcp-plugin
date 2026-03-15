@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addMarketOrigin, filterRemoteRepos, normalizeMarketOrigin, removeMarketOrigin } from './options-remote-services.js';
+import { addMarketOrigin, filterRemoteRepos, normalizeMarketOrigin, removeMarketOrigin, setRepoAllowWithoutConfirm } from './options-remote-services.js';
 
 describe('remote services filter', () => {
     const list = [
@@ -25,5 +25,15 @@ describe('remote services filter', () => {
     it('removes specific market origin', () => {
         const next = removeMarketOrigin(['https://market.page-mcp.org', 'http://localhost:5173'], 'http://localhost:5173');
         expect(next).toEqual(['https://market.page-mcp.org']);
+    });
+
+    it('updates allowWithoutConfirm for a repo', () => {
+        const list = [
+            { id: 'repo-1', allowWithoutConfirm: false },
+            { id: 'repo-2', allowWithoutConfirm: false },
+        ] as any[];
+        const next = setRepoAllowWithoutConfirm(list, 'repo-2', true);
+        expect(next.find((item) => item.id === 'repo-1')?.allowWithoutConfirm).toBe(false);
+        expect(next.find((item) => item.id === 'repo-2')?.allowWithoutConfirm).toBe(true);
     });
 });

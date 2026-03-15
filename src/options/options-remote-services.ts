@@ -33,3 +33,13 @@ export function addMarketOrigin(list: string[], originInput: string): string[] {
 export function removeMarketOrigin(list: string[], origin: string): string[] {
     return list.filter((item) => item !== origin);
 }
+
+export function setRepoAllowWithoutConfirm(
+    list: InstalledRemoteRepository[],
+    repoId: string,
+    allowWithoutConfirm: boolean
+): InstalledRemoteRepository[] {
+    return list.map((item) =>
+        item.id === repoId ? { ...item, allowWithoutConfirm } : item
+    );
+}

@@ -40,10 +40,12 @@ export async function runMcpConversationTurn(params: {
     toOpenAiMessages: (messages: ChatMessage[]) => OpenAIChatMessage[];
     buildOpenAiTools: (tools: ExecutableTool[]) => OpenAiToolDefinition[];
     formatToolResult: (result: unknown, outputSchema?: unknown) => string;
-    callCompletions: (messages: OpenAIChatMessage[]) => Promise<OpenAIChatCompletionResponse>;
-    streamCompletion: (messages: OpenAIChatMessage[], onDelta: (delta: string) => void, tools?: OpenAiToolDefinition[]) => Promise<void>;
+    callCompletions: (messages: OpenAIChatMessage[], signal?: AbortSignal) => Promise<OpenAIChatCompletionResponse>;
+    streamCompletion: (messages: OpenAIChatMessage[], onDelta: (delta: string) => void, tools?: OpenAiToolDefinition[], signal?: AbortSignal) => Promise<void>;
     updateConversation: (messages: ChatMessage[]) => void;
     persistConversation: (messages: ChatMessage[]) => Promise<void>;
+    confirmRemoteTool?: (tool: ExecutableTool, args: Record<string, unknown>) => Promise<boolean>;
+    signal?: AbortSignal;
 }): Promise<ChatMessage[]> {
     let messages = [...params.conversationMessages];
     try {
@@ -56,7 +58,7 @@ export async function runMcpConversationTurn(params: {
         let responseMessage: OpenAIResponseMessage | undefined;
 
         if (openAiTools.length > 0) {
-            let data = await params.callCompletions(workingMessages);
+            let data = await params.callCompletions(workingMessages, params.signal);
             responseMessage = data?.choices?.[0]?.message;
             const maxToolRounds = 4;
             let toolRound = 0;
@@ -101,6 +103,27 @@ export async function runMcpConversationTurn(params: {
                     }
 
                     try {
+                        if (executable.sourceType === 'remote' && params.confirmRemoteTool) {
+                            const allowed = await params.confirmRemoteTool(executable, args);
+                            if (!allowed) {
+                                const errorText = 'User canceled';
+                                workingMessages.push({
+                                    role: 'tool',
+                                    tool_call_id: toolCallId,
+                                    content: JSON.stringify({ error: errorText }),
+                                });
+                                toolMessages.push(createToolMessage({
+                                    toolCallId,
+                                    toolName: call.function.name,
+                                    displayName: executable.displayName,
+                                    args,
+                                    status: 'error',
+                                    error: errorText,
+                                }));
+                                continue;
+                            }
+                        }
+
                         const result = await executable.execute(args);
                         const toolResultText = params.formatToolResult(result, executable.outputSchema);
                         workingMessages.push({
@@ -139,7 +162,7 @@ export async function runMcpConversationTurn(params: {
                     params.updateConversation(messages);
                 }
 
-                data = await params.callCompletions(workingMessages);
+                data = await params.callCompletions(workingMessages, params.signal);
                 responseMessage = data?.choices?.[0]?.message;
                 toolRound += 1;
             }
@@ -168,7 +191,7 @@ export async function runMcpConversationTurn(params: {
                     : message
             ));
             params.updateConversation(messages);
-        }, openAiTools.length > 0 ? openAiTools : undefined);
+        }, openAiTools.length > 0 ? openAiTools : undefined, params.signal);
 
         if (!streamedText.trim() && responseMessage?.content) {
             messages = messages.map((message) => (
@@ -181,6 +204,10 @@ export async function runMcpConversationTurn(params: {
         await params.persistConversation(messages);
         return messages;
     } catch (error) {
+        if ((error as Error).name === 'AbortError') {
+            return messages; // User cancelled, just return current messages without appending error
+        }
+
         const appError: ChatMessage = {
             id: generateMessageId(),
             role: 'assistant',

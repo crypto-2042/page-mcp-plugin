@@ -560,14 +560,16 @@
 .pmcp-bubble a:hover { text-decoration: underline; }
 .pmcp-bubble strong { font-weight: 600; }
 
-.pmcp-inline-code {
+.pmcp-inline-code, .pmcp-bubble code {
     background: rgba(0,0,0,0.2);
     padding: 2px 6px;
     border-radius: 4px;
     font-family: 'SF Mono', 'Fira Code', monospace;
     font-size: 13px;
+    white-space: pre-wrap;
+    word-break: break-all;
 }
-.pmcp-code-block {
+.pmcp-code-block, .pmcp-bubble pre {
     background: rgba(0,0,0,0.3);
     padding: 12px;
     border-radius: var(--pmcp-radius-sm);
@@ -576,8 +578,16 @@
     font-family: 'SF Mono', 'Fira Code', monospace;
     font-size: 13px;
     line-height: 1.4;
+    white-space: pre-wrap;
+    word-break: break-all;
 }
-.pmcp-code-block code { color: var(--pmcp-text); }
+.pmcp-code-block code, .pmcp-bubble pre code { 
+    background: transparent;
+    padding: 0;
+    color: var(--pmcp-text);
+    white-space: pre-wrap;
+    word-break: break-all;
+}
 
 /* ---- Tables ---- */
 .pmcp-table, .pmcp-bubble table {
@@ -709,8 +719,34 @@ h4.pmcp-heading, .pmcp-bubble h4 { font-size: 14px; }
 .pmcp-resource-checkbox {
     width: 16px;
     height: 16px;
-    accent-color: var(--pmcp-accent);
     flex-shrink: 0;
+    appearance: none;
+    -webkit-appearance: none;
+    background-color: rgba(255, 255, 255, 0.15);
+    border: 1px solid var(--pmcp-border);
+    border-radius: 4px;
+    position: relative;
+    cursor: pointer;
+    transition: all var(--pmcp-transition-fast);
+}
+.pmcp-resource-checkbox:hover {
+    background-color: rgba(255, 255, 255, 0.25);
+    border-color: var(--pmcp-border-light);
+}
+.pmcp-resource-checkbox:checked {
+    background-color: var(--pmcp-accent);
+    border-color: var(--pmcp-accent);
+}
+.pmcp-resource-checkbox:checked::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 5px;
+    width: 4px;
+    height: 8px;
+    border: solid #ffffff;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
 }
 .pmcp-resource-meta {
     min-width: 0;
@@ -861,6 +897,81 @@ h4.pmcp-heading, .pmcp-bubble h4 { font-size: 14px; }
     transform: none;
 }
 .pmcp-wp-title { margin-top: 2px; }
+
+/* ---- Remote Tool Confirmation ---- */
+.pmcp-confirm-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2147483646;
+}
+.pmcp-confirm-modal {
+    width: min(92vw, 420px);
+    background: var(--pmcp-bg-primary);
+    border: 1px solid var(--pmcp-border);
+    border-radius: var(--pmcp-radius-lg);
+    padding: 16px;
+    box-shadow: var(--pmcp-shadow);
+}
+.pmcp-confirm-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+.pmcp-confirm-meta {
+    font-size: 12px;
+    color: var(--pmcp-text-secondary);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 12px;
+}
+.pmcp-confirm-args {
+    background: var(--pmcp-bg-secondary);
+    border: 1px solid var(--pmcp-border-light);
+    border-radius: var(--pmcp-radius-md);
+    padding: 10px;
+    margin-bottom: 12px;
+}
+.pmcp-confirm-args-label {
+    font-size: 12px;
+    color: var(--pmcp-text-muted);
+    margin-bottom: 6px;
+}
+.pmcp-confirm-args pre {
+    margin: 0;
+    max-height: 200px;
+    overflow: auto;
+    font-size: 12px;
+    color: var(--pmcp-text);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+.pmcp-confirm-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+.pmcp-btn-ghost {
+    border: 1px solid var(--pmcp-border);
+    background: transparent;
+    color: var(--pmcp-text-secondary);
+    border-radius: 10px;
+    padding: 8px 12px;
+    cursor: pointer;
+}
+.pmcp-btn-primary {
+    border: none;
+    background: var(--pmcp-accent);
+    color: #ffffff;
+    border-radius: 10px;
+    padding: 8px 12px;
+    cursor: pointer;
+}
+.pmcp-btn-primary:hover { background: var(--pmcp-accent-hover); }
 
 /* ---- Mobile ---- */
 @media (max-width: 768px) {

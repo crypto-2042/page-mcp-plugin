@@ -8,6 +8,8 @@ export interface StoredMcpTool {
     inputSchema?: Record<string, unknown>;
     annotations?: Record<string, unknown>;
     title?: string;
+    /** JS function string for page-level execution, e.g. `(args) => { ... }` */
+    execute?: string;
 }
 
 export interface StoredMcpPromptArgument {
@@ -109,6 +111,7 @@ export interface InstalledRemoteRepository {
     installSnapshot: InstallSnapshotPayload;
     integrity?: IntegrityPayload;
     enabled: boolean;
+    allowWithoutConfirm?: boolean;
     installedAt: number;
     updatedAt: number;
 }
@@ -120,19 +123,6 @@ export interface IntegrityPayload {
     digest: string;
 }
 
-export interface SnapshotMcpItem {
-    id?: string;
-    repositoryId?: string;
-    releaseId?: string;
-    name: string;
-    description?: string | null;
-    itemType: string;
-    manifest: Record<string, unknown>;
-    pathPattern: string;
-    createdAt?: string;
-    updatedAt?: string;
-}
-
 export interface SnapshotSkillItem {
     id?: string;
     repositoryId?: string;
@@ -142,7 +132,7 @@ export interface SnapshotSkillItem {
     version: string;
     skillMd: string;
     run?: string | null;
-    pathPattern: string;
+    path: string;
     createdAt?: string;
     updatedAt?: string;
 }
@@ -172,7 +162,7 @@ export interface InstallSnapshotPayload {
         createdAt: string;
     };
     snapshot: {
-        mcp: SnapshotMcpItem[];
+        mcp: StoredMcpSnapshot;
         skills: SnapshotSkillItem[];
     };
     integrity: IntegrityPayload;
@@ -216,7 +206,9 @@ export type PluginMessage =
     | { type: 'TOGGLE_MCP_SKILLS_REPO'; repoId: string; enabled: boolean; }
     | { type: 'DELETE_MCP_SKILLS_REPO'; repoId: string; }
     | { type: 'GET_ACTIVE_TAB_CHAT_STATUS'; }
-    | { type: 'OPEN_OPTIONS'; domain?: string; hasNativeChat?: boolean; };
+    | { type: 'OPEN_OPTIONS'; domain?: string; hasNativeChat?: boolean; }
+    | { type: 'CALL_REMOTE_TOOL'; apiBase: string; repositoryId: string; marketOrigin: string; toolName: string; args: Record<string, unknown>; }
+    | { type: 'EXECUTE_REMOTE_TOOL_IN_PAGE'; executeStr: string; args: Record<string, unknown>; };
 
 export const DEFAULT_SETTINGS: PluginSettings = {
     apiKey: '',

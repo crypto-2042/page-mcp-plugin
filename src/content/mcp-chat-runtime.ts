@@ -12,6 +12,7 @@ import { runMcpConversationTurn } from './mcp-conversation-turn.js';
 type SourceTagged = {
     sourceType: 'native' | 'remote';
     sourceLabel: string;
+    sourceRepositoryId?: string;
 };
 
 export function createMcpChatRuntime(params: {
@@ -26,7 +27,8 @@ export function createMcpChatRuntime(params: {
     toOpenAiMessages: (messages: ChatMessage[]) => OpenAIChatMessage[];
     formatToolResult: (result: unknown, outputSchema?: unknown) => string;
     safeRuntimeMessage: <T>(context: string, payload: unknown) => Promise<T | undefined>;
-    streamCompletion: (messages: OpenAIChatMessage[], onDelta: (delta: string) => void, tools?: OpenAiToolDefinition[]) => Promise<void>;
+    streamCompletion: (messages: OpenAIChatMessage[], onDelta: (delta: string) => void, tools?: OpenAiToolDefinition[], signal?: AbortSignal) => Promise<void>;
+    confirmRemoteTool?: (tool: ExecutableTool, args: Record<string, unknown>) => Promise<boolean>;
     runConversationTurn?: typeof runMcpConversationTurn;
 }) {
     const runConversation = params.runConversationTurn ?? runMcpConversationTurn;
@@ -37,6 +39,7 @@ export function createMcpChatRuntime(params: {
             updateConversation: (messages: ChatMessage[]) => void;
             persistConversation: (conversation: Conversation) => Promise<void>;
             baseConversation?: Conversation;
+            signal?: AbortSignal;
         }) {
             const executableTools = params.buildExecutionCatalog({
                 mcpClient: params.mcpClient,
@@ -49,8 +52,13 @@ export function createMcpChatRuntime(params: {
                 toOpenAiMessages: params.toOpenAiMessages,
                 buildOpenAiTools: params.buildOpenAiToolsFromCatalog,
                 formatToolResult: params.formatToolResult,
-                callCompletions: async (messages): Promise<OpenAIChatCompletionResponse> => {
+                signal: input.signal,
+                callCompletions: async (messages, signal): Promise<OpenAIChatCompletionResponse> => {
+                    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
                     const openAiTools = params.buildOpenAiToolsFromCatalog(executableTools);
+                    
+                    // If safeRuntimeMessage supported AbortSignal we would pass it.
+                    // For now we check again after it returns.
                     const res = await params.safeRuntimeMessage<{ data?: OpenAIChatCompletionResponse; error?: string }>('PROXY_API_CALL', {
                         type: 'PROXY_API_CALL',
                         endpoint: '/chat/completions',
@@ -61,11 +69,14 @@ export function createMcpChatRuntime(params: {
                             ...(openAiTools.length > 0 ? { tools: openAiTools, tool_choice: 'auto' } : {}),
                         },
                     });
+                    
+                    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
                     if (!res) throw new Error('Runtime unavailable');
                     if (res.error) throw new Error(res.error);
                     return res.data || {};
                 },
                 streamCompletion: params.streamCompletion,
+                confirmRemoteTool: params.confirmRemoteTool,
                 updateConversation: input.updateConversation,
                 persistConversation: async (messages) => {
                     const base = input.baseConversation;

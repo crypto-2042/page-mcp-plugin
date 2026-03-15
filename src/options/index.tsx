@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { DEFAULT_SETTINGS, PluginSettings, McpSkillsRepository } from '../shared/types.js';
 import './styles.css';
-import { addMarketOrigin, filterRemoteRepos, normalizeMarketOrigin, removeMarketOrigin } from './options-remote-services.js';
+import { addMarketOrigin, filterRemoteRepos, normalizeMarketOrigin, removeMarketOrigin, setRepoAllowWithoutConfirm } from './options-remote-services.js';
 
 const OptionsApp: React.FC = () => {
     const [settings, setSettings] = useState<PluginSettings>(DEFAULT_SETTINGS);
@@ -83,8 +83,15 @@ const OptionsApp: React.FC = () => {
                         setSavedSettings(mem);
                     }
                 }
-                if (area === 'local' && changes.pageMcpMcpSkillsRepos) {
-                    setMcpSkillsRepos(changes.pageMcpMcpSkillsRepos.newValue || []);
+                // Detect any McpSkills repo storage change (both legacy single-key and new per-item keys)
+                const mcpSkillsChanged = Object.keys(changes).some(
+                    (k) => k === 'pageMcpMcpSkillsRepos' || k === 'pageMcpMcpSkillsRepoIds' || k.startsWith('pageMcpMcpSkillsRepo:')
+                );
+                if (area === 'local' && mcpSkillsChanged) {
+                    // Reload all repos from background to get normalized, complete list
+                    chrome.runtime.sendMessage({ type: 'LIST_MCP_SKILLS_REPOS' })
+                        .then((resp: any) => setMcpSkillsRepos(resp?.items || []))
+                        .catch(() => {});
                 }
             });
         } catch (e) { }
@@ -182,6 +189,14 @@ const OptionsApp: React.FC = () => {
         setMcpSkillsRepos((prev) => prev.map((item) => item.id === repoId ? { ...item, enabled } : item));
     };
 
+    const toggleRepoAllowWithoutConfirm = async (repoId: string, allowWithoutConfirm: boolean) => {
+        const repo = mcpSkillsRepos.find((item) => item.id === repoId);
+        if (!repo) return;
+        const next = { ...repo, allowWithoutConfirm };
+        await chrome.runtime.sendMessage({ type: 'UPSERT_MCP_SKILLS_REPO', repo: next });
+        setMcpSkillsRepos((prev) => setRepoAllowWithoutConfirm(prev, repoId, allowWithoutConfirm));
+    };
+
     const deleteMcpSkillsRepo = async (repoId: string) => {
         await chrome.runtime.sendMessage({ type: 'DELETE_MCP_SKILLS_REPO', repoId });
         setMcpSkillsRepos((prev) => prev.filter((item) => item.id !== repoId));
@@ -267,7 +282,7 @@ const OptionsApp: React.FC = () => {
                         { id: 'model', icon: 'psychology', label: t('navModel') },
                         { id: 'interface', icon: 'palette', label: t('navInterface') },
                         // { id: 'security', icon: 'shield_lock', label: t('navSecurity') },
-                        // { id: 'remote', icon: 'cloud_sync', label: t('navRemoteServices') || 'MCP/Skills' },
+                        { id: 'remote', icon: 'cloud_sync', label: t('navRemoteServices') || 'MCP/Skills' },
                         { id: 'other', icon: 'more_horiz', label: t('navOther') }
                     ].map(nav => (
                         <a
@@ -881,6 +896,22 @@ const OptionsApp: React.FC = () => {
                                         </div>
                                         <label className="toggle">
                                             <input type="checkbox" checked={repo.enabled} onChange={(e) => toggleMcpSkillsRepo(repo.id, e.target.checked)} />
+                                            <span className="toggle-slider"></span>
+                                        </label>
+                                    </div>
+                                    <div className="card-row" style={{ marginTop: '10px' }}>
+                                        <div className="card-info">
+                                            <div>
+                                                <h3 className="card-title">{t('remoteAllowDirectExecTitle') || '允许直接执行'}</h3>
+                                                <p className="card-desc">{t('remoteAllowDirectExecDesc') || '远程工具执行无需二次确认。'}</p>
+                                            </div>
+                                        </div>
+                                        <label className="toggle">
+                                            <input
+                                                type="checkbox"
+                                                checked={repo.allowWithoutConfirm ?? false}
+                                                onChange={(e) => toggleRepoAllowWithoutConfirm(repo.id, e.target.checked)}
+                                            />
                                             <span className="toggle-slider"></span>
                                         </label>
                                     </div>

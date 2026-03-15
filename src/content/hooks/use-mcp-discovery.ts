@@ -5,11 +5,12 @@ import type {
     AnthropicMcpTool as ToolInfo,
 } from '@page-mcp/protocol';
 import { PostMessageTransport, PageMcpClient } from '@page-mcp/core';
-import type { PluginSettings } from '../../shared/types.js';
+import type { InstalledRemoteRepository, PluginSettings } from '../../shared/types.js';
 import { PM_CHANNEL } from '../../shared/constants.js';
 import { safeRuntimeMessage } from '../safe-runtime.js';
 import { injectExtensionIdMeta } from '../market-extension-id.js';
 import { loadNativeMcpState } from '../mcp-discovery.js';
+import { collectRemoteRepositoryContent, mergeWithSourceLabels } from '../remote-content.js';
 
 type WithSource<T> = T & {
     sourceType: 'native';
@@ -41,6 +42,8 @@ export function useMcpDiscovery(settings: PluginSettings, isSettingsLoaded: bool
     const toolsRef = useRef<WithSource<ToolInfo>[]>([]);
     const promptsRef = useRef<WithSource<PromptInfo>[]>([]);
     const resourcesRef = useRef<WithSource<ResourceInfo>[]>([]);
+    const skillsRef = useRef<any[]>([]);
+    const installedReposRef = useRef<InstalledRemoteRepository[]>([]);
     const nativeBaseRef = useRef<CapabilityState>({
         tools: [], prompts: [], resources: [], hostInfo: EMPTY_HOST,
     });
@@ -50,17 +53,19 @@ export function useMcpDiscovery(settings: PluginSettings, isSettingsLoaded: bool
     toolsRef.current = tools;
     promptsRef.current = prompts;
     resourcesRef.current = resources;
+    // skillsRef is updated directly inside refreshByPath — no state needed for popup queries
 
     useEffect(() => {
         if (!isSettingsLoaded) return;
 
         const applyCapabilities = (
-            next: { tools: Array<WithSource<ToolInfo>>; prompts: Array<WithSource<PromptInfo>>; resources: Array<WithSource<ResourceInfo>> },
+            next: { tools: Array<WithSource<ToolInfo>>; prompts: Array<WithSource<PromptInfo>>; resources: Array<WithSource<ResourceInfo>>; skills: any[] },
             hostInfo: { name: string; version: string }
         ) => {
             setTools(next.tools);
             setPrompts(next.prompts);
             setResources(next.resources);
+            skillsRef.current = next.skills;
             safeRuntimeMessage('MCP_DETECTED', {
                 type: 'MCP_DETECTED',
                 hostInfo,
@@ -71,10 +76,43 @@ export function useMcpDiscovery(settings: PluginSettings, isSettingsLoaded: bool
         const refreshByPath = async () => {
             const base = nativeBaseRef.current;
             const hasNativeBase = base.tools.length > 0 || base.prompts.length > 0 || base.resources.length > 0;
+
+            // Load market-installed repositories for current hostname
+            const hostname = window.location.hostname;
+            const pathname = window.location.pathname;
+            let marketRepos: InstalledRemoteRepository[] = [];
+            try {
+                const repoResp = await chrome.runtime.sendMessage({
+                    type: 'LIST_MCP_SKILLS_REPOS',
+                    hostname,
+                });
+                if (repoResp?.type === 'MCP_SKILLS_REPOS_RESULT' && Array.isArray(repoResp.items)) {
+                    marketRepos = repoResp.items;
+                }
+            } catch (e) {
+                // background may not be available — degrade gracefully
+            }
+
+            // Apply domain + path matching for each enabled repo
+            const remoteContent = collectRemoteRepositoryContent(marketRepos, hostname, pathname);
+            installedReposRef.current = marketRepos;
+
+            // Merge native and remote capabilities
+            const merged = mergeWithSourceLabels(
+                {
+                    tools: base.tools,
+                    prompts: base.prompts,
+                    resources: base.resources,
+                    skills: [],
+                },
+                remoteContent
+            );
+
             applyCapabilities({
-                tools: base.tools,
-                prompts: base.prompts,
-                resources: base.resources,
+                tools: merged.tools as Array<WithSource<ToolInfo>>,
+                prompts: merged.prompts as Array<WithSource<PromptInfo>>,
+                resources: merged.resources as Array<WithSource<ResourceInfo>>,
+                skills: merged.skills,
             }, hasNativeBase ? base.hostInfo : EMPTY_HOST);
         };
         refreshByPathRef.current = refreshByPath;
@@ -89,6 +127,9 @@ export function useMcpDiscovery(settings: PluginSettings, isSettingsLoaded: bool
             const nativeChat = !!document.getElementById('page-mcp-chat-widget');
             setHasNativeChat(nativeChat);
             safeRuntimeMessage('PAGE_CHAT_STATUS', { type: 'PAGE_CHAT_STATUS', hasNativeChat: nativeChat, domain: window.location.hostname });
+
+            // Immediately load market-installed repos (no need to wait for native bridge)
+            await refreshByPath();
 
             if (settings.autoDetect) {
                 console.log('[Page MCP Content] Starting MCP detection...');
@@ -122,6 +163,8 @@ export function useMcpDiscovery(settings: PluginSettings, isSettingsLoaded: bool
                     const hasNativeWidget = !!document.getElementById('page-mcp-chat-widget');
                     if (!hasNativeWidget) {
                         devWarn('[Page MCP Content] Bridge ready signal not observed; skip native MCP connect');
+                        // Still load market-installed repositories even without a native bridge
+                        await refreshByPath();
                         return;
                     }
                     devWarn('[Page MCP Content] Bridge ready signal not observed; native widget detected, attempt connect once');
@@ -137,17 +180,17 @@ export function useMcpDiscovery(settings: PluginSettings, isSettingsLoaded: bool
                         resources: nativeState.resources,
                         hostInfo: host,
                     };
-                    applyCapabilities({
-                        tools: nativeState.tools as Array<WithSource<ToolInfo>>,
-                        prompts: nativeState.prompts as Array<WithSource<PromptInfo>>,
-                        resources: nativeState.resources as Array<WithSource<ResourceInfo>>,
-                    }, host);
+                    // After updating native base, run a full refresh (includes remote repos)
+                    await refreshByPath();
                 } catch (e) {
                     devWarn('[Page MCP Content] Client connect failed:', e);
                     setMcpClient(null);
                     nativeBaseRef.current = { tools: [], prompts: [], resources: [], hostInfo: EMPTY_HOST };
-                    applyCapabilities({ tools: [], prompts: [], resources: [] }, EMPTY_HOST);
+                    await refreshByPath();
                 }
+            } else {
+                // autoDetect is off — still load market-installed repositories
+                await refreshByPath();
             }
         };
 
@@ -199,7 +242,7 @@ export function useMcpDiscovery(settings: PluginSettings, isSettingsLoaded: bool
                         tools: toolsRef.current,
                         prompts: promptsRef.current,
                         resources: resourcesRef.current,
-                        skills: [],
+                        skills: skillsRef.current,
                     },
                 });
                 return true;
@@ -229,5 +272,5 @@ export function useMcpDiscovery(settings: PluginSettings, isSettingsLoaded: bool
         };
     }, [isSettingsLoaded]);
 
-    return { mcpClient, tools, prompts, resources, hasNativeChat };
+    return { mcpClient, tools, prompts, resources, hasNativeChat, installedReposRef };
 }

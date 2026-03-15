@@ -29,17 +29,21 @@ describe('remote merge', () => {
         expect(shouldLoadRemoteRepositories({ remoteLoadingEnabled: false })).toBe(false);
     });
 
-    it('reads repository content from install snapshot and filters by regex pathPattern', () => {
+    it('reads repository content from install snapshot and filters by regex path', () => {
         const content = getLocalRepositoryContent({
             installSnapshot: {
                 snapshot: {
-                    mcp: [
-                        { name: 'match-tool', itemType: 'tool', pathPattern: '^/products/.*$', manifest: {} },
-                        { name: 'skip-tool', itemType: 'tool', pathPattern: '^/orders/.*$', manifest: {} },
-                    ],
+                    mcp: {
+                        tools: [
+                            { name: 'match-tool', path: '^/products/.*$' },
+                            { name: 'skip-tool', path: '^/orders/.*$' },
+                        ],
+                        prompts: [],
+                        resources: [],
+                    },
                     skills: [
-                        { name: 'match-skill', version: '1.0.0', skillMd: '# x', pathPattern: '^/products/.*$' },
-                        { name: 'skip-skill', version: '1.0.0', skillMd: '# x', pathPattern: '^/orders/.*$' },
+                        { name: 'match-skill', version: '1.0.0', skillMd: '# x', path: '^/products/.*$' },
+                        { name: 'skip-skill', version: '1.0.0', skillMd: '# x', path: '^/orders/.*$' },
                     ],
                 },
             },
@@ -67,7 +71,11 @@ describe('remote merge', () => {
                 siteDomain: 'shop.example.com',
                 installSnapshot: {
                     snapshot: {
-                        mcp: [{ name: 'remote-tool', itemType: 'tool', pathPattern: '^/products/.*$', manifest: {} }],
+                        mcp: {
+                            tools: [{ name: 'remote-tool', path: '^/products/.*$' }],
+                            prompts: [],
+                            resources: [],
+                        },
                         skills: [],
                     },
                 },
@@ -78,7 +86,14 @@ describe('remote merge', () => {
                 enabled: true,
                 siteDomain: 'other.example.com',
                 installSnapshot: {
-                    snapshot: { mcp: [{ name: 'skip-tool', itemType: 'tool', pathPattern: '^/products/.*$', manifest: {} }], skills: [] },
+                    snapshot: {
+                        mcp: {
+                            tools: [{ name: 'skip-tool', path: '^/products/.*$' }],
+                            prompts: [],
+                            resources: [],
+                        },
+                        skills: [],
+                    },
                 },
             },
         ] as any[], 'shop.example.com', '/products/iphone');

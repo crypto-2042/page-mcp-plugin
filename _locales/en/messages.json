@@ -411,5 +411,29 @@
     },
     "remoteDeleteConfirmBtn": {
         "message": "Delete"
+    },
+    "remoteAllowDirectExecTitle": {
+        "message": "Allow Direct Execution"
+    },
+    "remoteAllowDirectExecDesc": {
+        "message": "Execute remote tools without secondary confirmation."
+    },
+    "confirmRemoteToolTitle": {
+        "message": "Confirm Remote Tool Call"
+    },
+    "confirmRemoteToolName": {
+        "message": "Tool"
+    },
+    "confirmRemoteToolSource": {
+        "message": "Source"
+    },
+    "confirmRemoteToolArgs": {
+        "message": "Arguments"
+    },
+    "confirmRemoteToolCancel": {
+        "message": "Cancel"
+    },
+    "confirmRemoteToolAllow": {
+        "message": "Allow"
     }
 }

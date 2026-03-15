@@ -2,10 +2,12 @@ import type { PageMcpClient } from '@page-mcp/core';
 import type {
     AnthropicMcpTool,
 } from '@page-mcp/protocol';
+import { executeRemoteToolInPage } from './remote-tool-executor.js';
 
 type SourceTagged = {
     sourceType: 'native' | 'remote';
     sourceLabel: string;
+    sourceRepositoryId?: string;
 };
 
 export type ExecutableTool = {
@@ -15,11 +17,16 @@ export type ExecutableTool = {
     parameters: Record<string, unknown>;
     outputSchema?: unknown;
     execute: (args: Record<string, unknown>) => Promise<unknown>;
+    sourceType: SourceTagged['sourceType'];
+    sourceLabel: SourceTagged['sourceLabel'];
+    sourceRepositoryId?: string;
 };
 
 type ToolLike = AnthropicMcpTool & SourceTagged & {
     manifest?: Record<string, unknown>;
     outputSchema?: unknown;
+    /** JS function string for remote tools, e.g. `(args) => { ... }` */
+    execute?: string | ((...a: unknown[]) => unknown);
 };
 
 /**
@@ -50,18 +57,40 @@ function createUniqueToolName(base: string, used: Set<string>): string {
  * prompts (user-controlled) are handled through their own dedicated UI paths:
  *   - Resources → user attaches via checkbox → injected as system messages
  *   - Prompts  → user triggers via Quick Actions → messages injected into conversation
+ *
+ * **Native tools** execute via the page MCP bridge (mcpClient.callTool).
+ * **Remote tools** (from market-installed repos) carry an `execute` string
+ * (a JS function expression) which is evaluated in the page's MAIN world
+ * via the bridge script.
  */
 export function buildExecutionCatalog(params: {
     mcpClient: Pick<PageMcpClient, 'callTool'> | null;
     tools: ToolLike[];
-    executeRemoteTool?: (tool: ToolLike, args: Record<string, unknown>) => Promise<unknown>;
 }): ExecutableTool[] {
     const executableTools: ExecutableTool[] = [];
     const usedToolNames = new Set<string>();
 
-    // Native tools — executed via MCP client bridge
-    if (params.mcpClient) {
-        for (const tool of params.tools.filter((item) => item.sourceType === 'native')) {
+    for (const tool of params.tools) {
+        if (tool.sourceType === 'remote') {
+            // Remote tools → execute via MAIN world bridge
+            const executeStr = tool.execute;
+            if (typeof executeStr !== 'string' || !executeStr.trim()) {
+                console.warn(`[execution-catalog] Remote tool "${tool.name}" has no execute string, skipping`);
+                continue;
+            }
+            executableTools.push({
+                openAiName: createUniqueToolName(sanitizeToolName(tool.name), usedToolNames),
+                displayName: tool.name,
+                description: tool.description || tool.name,
+                parameters: (tool.inputSchema as unknown as Record<string, unknown>) || { type: 'object', properties: {} },
+                outputSchema: tool.outputSchema ?? tool.manifest?.outputSchema,
+                execute: (args) => executeRemoteToolInPage(executeStr, args),
+                sourceType: tool.sourceType,
+                sourceLabel: tool.sourceLabel,
+                sourceRepositoryId: tool.sourceRepositoryId,
+            });
+        } else if (params.mcpClient) {
+            // Native tools → execute via page MCP bridge
             executableTools.push({
                 openAiName: createUniqueToolName(sanitizeToolName(tool.name), usedToolNames),
                 displayName: tool.name,
@@ -69,25 +98,12 @@ export function buildExecutionCatalog(params: {
                 parameters: (tool.inputSchema as unknown as Record<string, unknown>) || { type: 'object', properties: {} },
                 outputSchema: tool.outputSchema ?? tool.manifest?.outputSchema,
                 execute: (args) => params.mcpClient!.callTool(tool.name, args),
+                sourceType: tool.sourceType,
+                sourceLabel: tool.sourceLabel,
+                sourceRepositoryId: tool.sourceRepositoryId,
             });
         }
-    }
-
-    // Remote tools — executed via remote handler
-    for (const tool of params.tools.filter((item) => item.sourceType === 'remote')) {
-        executableTools.push({
-            openAiName: createUniqueToolName(sanitizeToolName(tool.name), usedToolNames),
-            displayName: tool.name,
-            description: tool.description || `Execute remote tool ${tool.name}`,
-            parameters: ((tool.inputSchema as unknown as Record<string, unknown>) || (tool.manifest?.inputSchema as Record<string, unknown>) || { type: 'object', properties: {} }),
-            outputSchema: tool.outputSchema ?? tool.manifest?.outputSchema,
-            execute: (args) => {
-                if (!params.executeRemoteTool) {
-                    throw new Error(`Remote tool execution is unavailable for ${tool.name}`);
-                }
-                return params.executeRemoteTool(tool, args);
-            },
-        });
+        // If native tool but no mcpClient → skip (can't execute)
     }
 
     return executableTools;

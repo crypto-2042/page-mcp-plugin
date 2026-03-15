@@ -13,6 +13,8 @@ export interface RemoteMcpItem {
     itemType?: string;
     manifest?: Record<string, unknown>;
     prompt?: string;
+    /** JS function string for page-level execution */
+    execute?: string;
 }
 
 export interface RemoteSkillItem {
@@ -133,16 +135,16 @@ export function mergeMcpBuckets<TTool, TPrompt, TResource>(
     };
 }
 
-function matchesPathPattern(pathname: string, pathPattern?: string): boolean {
-    if (!pathPattern) return true;
-    let compiled = regexCache.get(pathPattern);
+function matchesPath(pathname: string, path?: string): boolean {
+    if (!path) return true;
+    let compiled = regexCache.get(path);
     if (compiled === undefined) {
         try {
-            compiled = new RegExp(pathPattern);
+            compiled = new RegExp(path);
         } catch {
             compiled = null;
         }
-        regexCache.set(pathPattern, compiled);
+        regexCache.set(path, compiled);
     }
     if (!compiled) return false;
     return compiled.test(pathname);
@@ -154,39 +156,42 @@ export function getLocalRepositoryContent(
 ): RemoteRepositoryContent {
     const snapshot = repo.installSnapshot?.snapshot;
     if (!snapshot) return { tools: [], prompts: [], resources: [], skills: [] };
-    const mcpItems = snapshot.mcp ?? [];
+    const mcp = snapshot.mcp;
     const skillItems = snapshot.skills ?? [];
 
-    const filtered = mcpItems.filter((item) => matchesPathPattern(pathname, item.pathPattern));
+    // snapshot.mcp is StoredMcpSnapshot: { tools, prompts, resources }
+    const tools = Array.isArray(mcp?.tools) ? mcp.tools : [];
+    const prompts = Array.isArray(mcp?.prompts) ? mcp.prompts : [];
+    const resources = Array.isArray(mcp?.resources) ? mcp.resources : [];
 
     return {
-        tools: filtered
-            .filter((item) => item.itemType === 'tool')
+        tools: tools
+            .filter((item) => matchesPath(pathname, (item as any).path))
             .map((item) => ({
                 name: item.name,
                 description: item.description,
-                itemType: item.itemType,
-                manifest: item.manifest,
+                inputSchema: item.inputSchema,
+                annotations: item.annotations,
+                execute: item.execute,
             })),
-        prompts: filtered
-            .filter((item) => item.itemType === 'prompt')
+        prompts: prompts
+            .filter((item) => matchesPath(pathname, (item as any).path))
             .map((item) => ({
                 name: item.name,
                 description: item.description,
-                itemType: item.itemType,
-                manifest: item.manifest,
-                prompt: typeof item.manifest?.prompt === 'string' ? item.manifest.prompt : undefined,
+                arguments: item.arguments,
+                messages: item.messages,
             })),
-        resources: filtered
-            .filter((item) => item.itemType === 'resource')
+        resources: resources
+            .filter((item) => matchesPath(pathname, (item as any).path))
             .map((item) => ({
                 name: item.name,
                 description: item.description,
-                itemType: item.itemType,
-                manifest: item.manifest,
+                uri: item.uri,
+                mimeType: item.mimeType,
             })),
         skills: skillItems
-            .filter((item) => matchesPathPattern(pathname, item.pathPattern))
+            .filter((item) => matchesPath(pathname, item.path))
             .map((item) => ({
                 name: item.name,
                 description: item.description,

@@ -1,5 +1,4 @@
 import type { RemoteInstallRequest, StoredMcpSnapshot } from '../shared/types.js';
-import { toStoredMcpSnapshot } from '../shared/remote-repos.js';
 
 export const DEFAULT_MARKET_ORIGINS = [
     'https://market.page-mcp.org',
@@ -28,40 +27,68 @@ function asRecord(value: unknown): Record<string, unknown> | null {
     return null;
 }
 
-function readProtocolMcp(value: unknown): StoredMcpSnapshot | null {
+/**
+ * Try to read a StoredMcpSnapshot from a record that has { mcp: { tools, prompts, resources } }.
+ * Handles both direct layout (value.mcp.tools) and nested layout (value.snapshot.mcp.tools).
+ */
+function readMcpBucket(value: unknown): StoredMcpSnapshot | null {
     const record = asRecord(value);
     if (!record) return null;
+
+    // Try value.mcp.{tools,prompts,resources}
     const rawMcp = isRecord(record.mcp) ? record.mcp : null;
-    if (!rawMcp) return null;
-    const tools = rawMcp.tools;
-    const prompts = rawMcp.prompts;
-    const resources = rawMcp.resources;
-    if (!Array.isArray(tools) || !Array.isArray(prompts) || !Array.isArray(resources)) return null;
-    return {
-        tools: tools as StoredMcpSnapshot['tools'],
-        prompts: prompts as StoredMcpSnapshot['prompts'],
-        resources: resources as StoredMcpSnapshot['resources'],
-    };
+    if (rawMcp && Array.isArray(rawMcp.tools) && Array.isArray(rawMcp.prompts) && Array.isArray(rawMcp.resources)) {
+        return {
+            tools: rawMcp.tools as StoredMcpSnapshot['tools'],
+            prompts: rawMcp.prompts as StoredMcpSnapshot['prompts'],
+            resources: rawMcp.resources as StoredMcpSnapshot['resources'],
+        };
+    }
+
+    // Try value.snapshot.mcp.{tools,prompts,resources}
+    const snapshot = isRecord(record.snapshot) ? record.snapshot : null;
+    if (snapshot) {
+        const nestedMcp = isRecord(snapshot.mcp) ? snapshot.mcp : null;
+        if (nestedMcp && Array.isArray(nestedMcp.tools) && Array.isArray(nestedMcp.prompts) && Array.isArray(nestedMcp.resources)) {
+            return {
+                tools: nestedMcp.tools as StoredMcpSnapshot['tools'],
+                prompts: nestedMcp.prompts as StoredMcpSnapshot['prompts'],
+                resources: nestedMcp.resources as StoredMcpSnapshot['resources'],
+            };
+        }
+        // Accept snapshot.mcp as empty-but-valid when skills are present
+        if (Array.isArray(snapshot.skills) && !snapshot.mcp) {
+            return { tools: [], prompts: [], resources: [] };
+        }
+    }
+
+    return null;
 }
 
-function readSnapshotArrays(value: unknown): { mcp: unknown[]; skills: unknown[] } | null {
-    const record = asRecord(value);
-    if (!record) return null;
-    const snapshot = isRecord(record.snapshot) ? record.snapshot : record;
-    const mcp = snapshot.mcp;
-    const skills = snapshot.skills;
-    if (!Array.isArray(mcp) || !Array.isArray(skills)) return null;
-    return { mcp, skills };
-}
-
+/**
+ * Check if the incoming value is a valid installSnapshot payload.
+ * Accepts:
+ *   - { mcp: { tools, prompts, resources } }           (direct protocol bucket)
+ *   - { snapshot: { mcp: { tools, prompts, resources }, skills: [] } }  (full API response)
+ *   - { snapshot: { skills: [] } }                     (skills-only, no mcp)
+ */
 function isInstallSnapshot(value: unknown): boolean {
-    return !!readProtocolMcp(value) || !!readSnapshotArrays(value);
+    return !!readMcpBucket(value);
+}
+
+function defaultMcpSnapshot(): StoredMcpSnapshot {
+    return { tools: [], prompts: [], resources: [] };
+}
+
+function normalizeStoredMcp(value: unknown): StoredMcpSnapshot {
+    return readMcpBucket(value) ?? defaultMcpSnapshot();
 }
 
 function normalizeInstallSnapshot(value: unknown): RemoteInstallRequest['installSnapshot'] {
     const raw = asRecord(value) ?? {};
-    const snapshotRaw = readSnapshotArrays(value) ?? { mcp: [], skills: [] };
-    const snapshot = isRecord(raw.snapshot) ? raw.snapshot : raw;
+    const rawSnapshot = isRecord(raw.snapshot) ? raw.snapshot : null;
+    // mcp is always StoredMcpSnapshot — read it from the appropriate location
+    const mcp = normalizeStoredMcp(value);
     return {
         repository: isRecord(raw.repository) ? raw.repository as any : {
             id: '',
@@ -84,22 +111,14 @@ function normalizeInstallSnapshot(value: unknown): RemoteInstallRequest['install
             createdAt: '',
         },
         snapshot: {
-            mcp: snapshotRaw.mcp as any[],
-            skills: snapshotRaw.skills as any[],
+            mcp,
+            skills: rawSnapshot && Array.isArray(rawSnapshot.skills) ? rawSnapshot.skills as any[] : [],
         },
         integrity: isRecord(raw.integrity) ? raw.integrity as any : {
             algorithm: '',
             digest: '',
         },
     };
-}
-
-function normalizeStoredMcp(value: unknown): StoredMcpSnapshot {
-    const protocolMcp = readProtocolMcp(value);
-    if (protocolMcp) return protocolMcp;
-    const legacy = readSnapshotArrays(value);
-    if (!legacy) return { tools: [], prompts: [], resources: [] };
-    return toStoredMcpSnapshot(legacy.mcp as any[]);
 }
 
 function normalizeOrigin(origin: string): string {
