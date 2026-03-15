@@ -10,6 +10,8 @@ describe('createMcpChatRuntime', () => {
             description: 'Tool A',
             parameters: {},
             execute: async () => ({}),
+            sourceType: 'native' as const,
+            sourceLabel: 'Local Tool',
         }]);
         const buildOpenAiToolsFromCatalog = vi.fn(() => [{
             type: 'function' as const,
