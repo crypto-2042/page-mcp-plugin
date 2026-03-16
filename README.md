@@ -18,6 +18,10 @@
 
 **Page MCP** is a Chrome extension built for the **Page MCP** ecosystem. It discovers and connects to [Model Context Protocol (MCP)](https://modelcontextprotocol.io) services exposed by web pages — built on top of the **Anthropic MCP** standard and **WebMCP** extensions — and uses them to power rich AI interactions directly within the browser.
 
+<p align="center">
+  <img src="docs/page-mcp.jpg" alt="Page MCP Architecture Diagram" width="800" />
+</p>
+
 ### Core Capabilities
 
 | Capability | Description |

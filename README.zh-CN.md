@@ -18,6 +18,10 @@
 
 **Page MCP** 是为 **Page MCP** 生态系统打造的 Chrome 浏览器扩展。它能够发现并连接网页通过 `@page-mcp/core` 暴露的 [Model Context Protocol (MCP)](https://modelcontextprotocol.io) 服务 —— 基于 **Anthropic MCP** 标准和 **WebMCP** 扩展协议构建 —— 并以此驱动浏览器内的丰富 AI 交互体验。
 
+<p align="center">
+  <img src="docs/page-mcp.jpg" alt="Page MCP 架构原理图" width="800" />
+</p>
+
 ### 核心能力
 
 | 能力 | 说明 |

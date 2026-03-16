@@ -252,7 +252,7 @@ const App: React.FC = () => {
             const payload = buildRepositoryPayloadFromForm(form, existingRepo, Date.now(), createUuid);
             await chrome.runtime.sendMessage({ type: 'UPSERT_MCP_SKILLS_REPO', repo: payload });
             showToast(editing ? 'Repository updated' : 'Repository created');
-            setTimeout(() => window.location.assign(chrome.runtime.getURL('options.html')), 400);
+            setTimeout(() => window.close(), 400);
         } catch (e: any) {
             setError(e?.message || 'Failed to save repository.');
         } finally {
@@ -509,7 +509,7 @@ const App: React.FC = () => {
 
                         <div className="glass-card" style={{ marginTop: 24 }}>
                             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-                                <button className="btn btn-ghost" type="button" onClick={() => window.location.assign(chrome.runtime.getURL('options.html'))}>{t('cancelBtn', 'Cancel')}</button>
+                                <button className="btn btn-ghost" type="button" onClick={() => window.close()}>{t('cancelBtn', 'Cancel')}</button>
                                 <button className="btn btn-primary" type="button" onClick={save} disabled={saving}>{saving ? t('savingBtn', 'Saving...') : t('saveRepoBtn', 'Save Repository')}</button>
                             </div>
                         </div>

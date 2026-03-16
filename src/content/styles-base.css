@@ -929,26 +929,55 @@ h4.pmcp-heading, .pmcp-bubble h4 { font-size: 14px; }
     gap: 4px;
     margin-bottom: 12px;
 }
-.pmcp-confirm-args {
+.pmcp-confirm-args-form {
     background: var(--pmcp-bg-secondary);
     border: 1px solid var(--pmcp-border-light);
     border-radius: var(--pmcp-radius-md);
-    padding: 10px;
+    padding: 12px;
     margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 300px;
+    overflow-y: auto;
 }
 .pmcp-confirm-args-label {
     font-size: 12px;
     color: var(--pmcp-text-muted);
-    margin-bottom: 6px;
-}
-.pmcp-confirm-args pre {
     margin: 0;
-    max-height: 200px;
-    overflow: auto;
+    font-weight: 500;
+}
+.pmcp-confirm-arg-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.pmcp-confirm-arg-key {
     font-size: 12px;
+    font-weight: 600;
+    font-family: 'SF Mono', 'Fira Code', monospace;
     color: var(--pmcp-text);
+}
+.pmcp-confirm-arg-value {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 10px;
+    background: var(--pmcp-bg-input);
+    border: 1px solid var(--pmcp-border);
+    border-radius: var(--pmcp-radius-sm);
+    color: var(--pmcp-text);
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 12px;
+    outline: none;
+    cursor: default;
+}
+.pmcp-confirm-arg-value:focus {
+    border-color: var(--pmcp-border-focus);
+}
+.pmcp-confirm-arg-textarea {
+    resize: vertical;
     white-space: pre-wrap;
-    word-break: break-word;
+    word-break: break-all;
 }
 .pmcp-confirm-actions {
     display: flex;

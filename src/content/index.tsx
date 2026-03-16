@@ -233,14 +233,7 @@ const ChatWidget = () => {
         setPendingToolConfirm(null);
     };
 
-    const formatConfirmArgs = (args: Record<string, unknown>) => {
-        try {
-            const text = JSON.stringify(args, null, 2);
-            return text.length > 2000 ? `${text.slice(0, 2000)}...` : text;
-        } catch {
-            return String(args);
-        }
-    };
+
 
     // --- Chat Runtime ---
     const chatRuntime = createMcpChatRuntime({
@@ -655,10 +648,44 @@ const ChatWidget = () => {
                             <div><strong>{t('confirmRemoteToolName') || '工具'}:</strong> {pendingToolConfirm.toolName}</div>
                             <div><strong>{t('confirmRemoteToolSource') || '来源'}:</strong> {pendingToolConfirm.sourceLabel}</div>
                         </div>
-                        <div className="pmcp-confirm-args">
-                            <div className="pmcp-confirm-args-label">{t('confirmRemoteToolArgs') || '参数'}</div>
-                            <pre>{formatConfirmArgs(pendingToolConfirm.args)}</pre>
-                        </div>
+                        {Object.keys(pendingToolConfirm.args).length > 0 && (
+                            <div className="pmcp-confirm-args-form">
+                                <div className="pmcp-confirm-args-label">{t('confirmRemoteToolArgs') || '参数'}</div>
+                                {Object.entries(pendingToolConfirm.args).map(([key, value]) => {
+                                    let displayValue = '';
+                                    try {
+                                        if (typeof value === 'object' && value !== null) {
+                                            displayValue = JSON.stringify(value, null, 2);
+                                        } else {
+                                            displayValue = String(value);
+                                        }
+                                        if (displayValue.length > 2000) displayValue = `${displayValue.slice(0, 2000)}...`;
+                                    } catch {
+                                        displayValue = String(value);
+                                    }
+                                    const isMultiline = displayValue.includes('\n') || displayValue.length > 60;
+                                    return (
+                                        <div key={key} className="pmcp-confirm-arg-row">
+                                            <label className="pmcp-confirm-arg-key" title={key}>{key}</label>
+                                            {isMultiline ? (
+                                                <textarea 
+                                                    className="pmcp-confirm-arg-value pmcp-confirm-arg-textarea" 
+                                                    value={displayValue} 
+                                                    readOnly 
+                                                    rows={Math.min(displayValue.split('\n').length, 10)}
+                                                />
+                                            ) : (
+                                                <input 
+                                                    className="pmcp-confirm-arg-value" 
+                                                    value={displayValue} 
+                                                    readOnly 
+                                                />
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
                         <div className="pmcp-confirm-actions">
                             <button className="pmcp-btn-ghost" type="button" onClick={() => resolveToolConfirm(false)}>
                                 {t('confirmRemoteToolCancel') || '取消'}

@@ -874,61 +874,60 @@ const OptionsApp: React.FC = () => {
                                 <p className="card-desc">{t('remoteEmpty') || '暂无 MCP/Skills 仓库。请先创建。'}</p>
                             </div>
                         ) : (
-                            filteredMcpSkillsRepos.map((repo) => (
-                                <div key={repo.id} className="glass-card">
-                                    <div className="card-row" style={{ alignItems: 'flex-start' }}>
-                                        <div className="card-info">
-                                            <div className="card-icon-wrap">
-                                                <span className="material-symbols-outlined">deployed_code</span>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '16px' }}>
+                                {filteredMcpSkillsRepos.map((repo) => (
+                                    <div key={repo.id} className="glass-card" style={{ display: 'flex', flexDirection: 'column' }}>
+                                        <div className="card-row" style={{ alignItems: 'flex-start' }}>
+                                            <div className="card-info">
+                                                <div className="card-icon-wrap">
+                                                    <span className="material-symbols-outlined">deployed_code</span>
+                                                </div>
+                                                <div style={{ minWidth: 0 }}>
+                                                    <h3 className="card-title" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                        {repo.repositoryName}
+                                                    </h3>
+                                                    <p className="card-desc" style={{ marginTop: '6px' }}>
+                                                        <strong>{t('remoteDomain') || '域名'}:</strong> {repo.siteDomain}
+                                                        <br />
+                                                        <strong>{t('remoteVersion') || '版本'}:</strong> {repo.release}
+                                                    </p>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <h3 className="card-title">{repo.repositoryName}</h3>
-                                                <p className="card-desc" style={{ marginTop: '6px' }}>
-                                                    <strong>ID:</strong> {repo.repositoryId}
-                                                    <br />
-                                                    <strong>{t('remoteDomain') || '域名'}:</strong> {repo.siteDomain}
-                                                    <br />
-                                                    <strong>{t('remoteVersion') || '版本'}:</strong> {repo.release}
-                                                    <br />
-                                                    <strong>{t('remoteMarket') || '市场'}:</strong> {repo.marketOrigin}
-                                                </p>
-                                            </div>
+                                            <label className="toggle" style={{ flexShrink: 0 }}>
+                                                <input type="checkbox" checked={repo.enabled} onChange={(e) => toggleMcpSkillsRepo(repo.id, e.target.checked)} />
+                                                <span className="toggle-slider"></span>
+                                            </label>
                                         </div>
-                                        <label className="toggle">
-                                            <input type="checkbox" checked={repo.enabled} onChange={(e) => toggleMcpSkillsRepo(repo.id, e.target.checked)} />
-                                            <span className="toggle-slider"></span>
-                                        </label>
-                                    </div>
-                                    <div className="card-row" style={{ marginTop: '10px' }}>
-                                        <div className="card-info">
-                                            <div>
-                                                <h3 className="card-title">{t('remoteAllowDirectExecTitle') || '允许直接执行'}</h3>
-                                                <p className="card-desc">{t('remoteAllowDirectExecDesc') || '远程工具执行无需二次确认。'}</p>
+                                        <div className="card-row" style={{ marginTop: '16px', alignItems: 'center' }}>
+                                            <div className="card-info" style={{ flex: 1 }}>
+                                                <h3 className="card-title" style={{ fontSize: '13px', margin: 0 }}>
+                                                    {t('remoteAllowDirectExecTitle') || '允许直接执行'}
+                                                </h3>
                                             </div>
+                                            <label className="toggle" style={{ transform: 'scale(0.8)', transformOrigin: 'right center', flexShrink: 0 }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={repo.allowWithoutConfirm ?? false}
+                                                    onChange={(e) => toggleRepoAllowWithoutConfirm(repo.id, e.target.checked)}
+                                                />
+                                                <span className="toggle-slider"></span>
+                                            </label>
                                         </div>
-                                        <label className="toggle">
-                                            <input
-                                                type="checkbox"
-                                                checked={repo.allowWithoutConfirm ?? false}
-                                                onChange={(e) => toggleRepoAllowWithoutConfirm(repo.id, e.target.checked)}
-                                            />
-                                            <span className="toggle-slider"></span>
-                                        </label>
+                                        <div style={{ display: 'flex', gap: '10px', marginTop: 'auto', paddingTop: '20px', justifyContent: 'center' }}>
+                                            <button
+                                                className="btn btn-outline"
+                                                type="button"
+                                                onClick={() => chrome.tabs.create({ url: chrome.runtime.getURL(`options-mcp-skills.html?id=${encodeURIComponent(repo.id)}`) })}
+                                            >
+                                                编辑
+                                            </button>
+                                            <button className="btn btn-danger" type="button" onClick={() => setConfirmDeleteRepo(repo)}>
+                                                {t('remoteDelete') || '删除'}
+                                            </button>
+                                        </div>
                                     </div>
-                                    <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
-                                        <button
-                                            className="btn btn-outline"
-                                            type="button"
-                                            onClick={() => chrome.tabs.create({ url: chrome.runtime.getURL(`options-mcp-skills.html?id=${encodeURIComponent(repo.id)}`) })}
-                                        >
-                                            编辑
-                                        </button>
-                                        <button className="btn btn-danger" type="button" onClick={() => setConfirmDeleteRepo(repo)}>
-                                            {t('remoteDelete') || '删除'}
-                                        </button>
-                                    </div>
-                                </div>
-                            ))
+                                ))}
+                            </div>
                         )}
                     </div>
                 </section>
