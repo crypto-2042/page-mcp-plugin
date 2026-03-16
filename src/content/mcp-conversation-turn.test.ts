@@ -47,7 +47,7 @@ describe('runMcpConversationTurn', () => {
                 description: 'Read title',
                 parameters: { type: 'object', properties: {} },
                 execute: async () => ({ title: 'Hello' }),
-            }],
+            } as any],
             toOpenAiMessages: () => [{ role: 'user', content: 'read title' }],
             buildOpenAiTools: () => [{
                 type: 'function' as const,

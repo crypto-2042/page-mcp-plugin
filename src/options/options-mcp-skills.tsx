@@ -21,6 +21,7 @@ function newToolRow(): ToolForm {
         description: '',
         path: '.*',
         execute: '',
+        inputSchemaStr: '',
     };
 }
 
@@ -31,6 +32,7 @@ function newPromptRow(): PromptForm {
         description: '',
         path: '.*',
         prompt: '',
+        argumentsStr: '',
     };
 }
 
@@ -278,6 +280,14 @@ const App: React.FC = () => {
     const saveToolModal = () => {
         if (!toolModalItem) return;
         if (!toolModalItem.name.trim()) return alert('Name is required');
+        
+        if (toolModalItem.inputSchemaStr.trim()) {
+            try {
+                JSON.parse(toolModalItem.inputSchemaStr);
+            } catch (e) {
+                return alert('Input Schema must be valid JSON');
+            }
+        }
 
         const { id } = toolModalItem;
         const index = form.tools.findIndex(i => i.id === id);
@@ -294,6 +304,14 @@ const App: React.FC = () => {
     const savePromptModal = () => {
         if (!promptModalItem) return;
         if (!promptModalItem.name.trim()) return alert('Name is required');
+        
+        if (promptModalItem.argumentsStr.trim()) {
+            try {
+                JSON.parse(promptModalItem.argumentsStr);
+            } catch (e) {
+                return alert('Arguments must be valid JSON');
+            }
+        }
 
         const { id } = promptModalItem;
         const index = form.prompts.findIndex(i => i.id === id);
@@ -520,6 +538,10 @@ const App: React.FC = () => {
                             <label className="input-label" style={{ display: 'block', marginBottom: 6, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Execute Script (JS)</label>
                             <textarea className="glass-input" placeholder="() => { ... }" value={toolModalItem.execute} onChange={(e) => setToolModalItem({ ...toolModalItem, execute: e.target.value })} style={{ minHeight: 120, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }} />
                         </div>
+                        <div className="form-group">
+                            <label className="input-label" style={{ display: 'block', marginBottom: 6, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Input Schema (JSON)</label>
+                            <textarea className="glass-input" placeholder='{"type": "object", "properties": {}}' value={toolModalItem.inputSchemaStr} onChange={(e) => setToolModalItem({ ...toolModalItem, inputSchemaStr: e.target.value })} style={{ minHeight: 80, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }} />
+                        </div>
 
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 }}>
                             {editing && toolModalItem.id && form.tools.some(i => i.id === toolModalItem.id) ? (
@@ -554,6 +576,10 @@ const App: React.FC = () => {
                         <div className="form-group">
                             <label className="input-label" style={{ display: 'block', marginBottom: 6, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Prompt Template</label>
                             <textarea className="glass-input" placeholder="Enter prompt text or template" value={promptModalItem.prompt} onChange={(e) => setPromptModalItem({ ...promptModalItem, prompt: e.target.value })} style={{ minHeight: 100 }} />
+                        </div>
+                        <div className="form-group">
+                            <label className="input-label" style={{ display: 'block', marginBottom: 6, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Arguments (JSON)</label>
+                            <textarea className="glass-input" placeholder='[{"name": "arg1", "description": "some arg", "required": true}]' value={promptModalItem.argumentsStr} onChange={(e) => setPromptModalItem({ ...promptModalItem, argumentsStr: e.target.value })} style={{ minHeight: 80, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }} />
                         </div>
 
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 }}>

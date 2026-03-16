@@ -14,7 +14,7 @@ describe('mcp skills local form mapping', () => {
         const form = getEmptyFormState();
         form.repositoryName = 'Local Repo';
         form.siteDomain = 'Shop.Example.com';
-        form.tools = [{ id: 't1', name: 'toolA', description: 'd', path: '', execute: 'return 1;' }];
+        form.tools = [{ id: 't1', name: 'toolA', description: 'd', path: '', execute: 'return 1;', inputSchemaStr: '' }];
 
         const payload = buildRepositoryPayloadFromForm(form, null, 100, () => 'uuid-1');
 
@@ -96,9 +96,9 @@ describe('mcp skills local form mapping', () => {
             marketOrigin: 'local://mcp-skills',
             marketDetailUrl: '',
             mcp: {
-                tools: [{ name: 'tool-x', description: 'd1', execute: '() => 1', path: '^/x$' }],
-                prompts: [{ name: 'prompt-x', description: 'd2', messages: [{ role: 'user', content: { type: 'text', text: 'hello' } }], path: '^/p$' }],
-                resources: [{ uri: 'page://resource-x', name: 'resource-x', description: 'd3', mimeType: 'text/plain', path: '^/r$' }],
+                tools: [{ name: 'tool-x', description: 'd1', execute: '() => 1', path: '^/x$' } as any],
+                prompts: [{ name: 'prompt-x', description: 'd2', messages: [{ role: 'user', content: { type: 'text', text: 'hello' } }], path: '^/p$' } as any],
+                resources: [{ uri: 'page://resource-x', name: 'resource-x', description: 'd3', mimeType: 'text/plain', path: '^/r$' } as any],
             },
             installSnapshot: {
                 repository: {
@@ -153,7 +153,7 @@ describe('mcp skills local form mapping', () => {
         const form = getEmptyFormState();
         form.repositoryName = 'Local Repo';
         form.siteDomain = 'example.com';
-        form.prompts = [{ id: 'p1', name: 'promptA', description: '', path: '.*', prompt: 'hi' }];
+        form.prompts = [{ id: 'p1', name: 'promptA', description: '', path: '.*', prompt: 'hi', argumentsStr: '' }];
 
         const payload = buildRepositoryPayloadFromForm(form, null, 100, () => 'uuid-2');
 

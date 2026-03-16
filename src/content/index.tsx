@@ -13,7 +13,7 @@ import { renderMarkdown } from './markdown.js';
 import { formatToolResult } from './tool-result-format.js';
 import { buildQuickActionCandidates } from './quick-actions.js';
 import { buildExecutionCatalog, type ExecutableTool } from './execution-catalog.js';
-import { buildAttachedResourceMessages } from './mcp-resources.js';
+import { buildAttachedResourceMessages, readLocalResource } from './mcp-resources.js';
 import { applyPromptShortcutMessages } from './mcp-prompt-shortcuts.js';
 import {
     getInitialAttachedResourceUris,
@@ -256,6 +256,16 @@ const ChatWidget = () => {
         confirmRemoteTool,
     });
 
+    const handleReadResource = async (uri: string) => {
+        if (uri.startsWith('page://')) {
+            return readLocalResource(uri);
+        }
+        if (mcpClient) {
+            return mcpClient.readResource(uri);
+        }
+        throw new Error(`Cannot read resource without a native MCP client: ${uri}`);
+    };
+
     const handleSend = async (text: string = inputText) => {
         if (!text.trim() || isLoading) return;
         setInputText('');
@@ -267,14 +277,12 @@ const ChatWidget = () => {
             createConversation,
             prepareMessages: async () => {
                 const userMessage: ChatMessage = { id: generateMessageId(), role: 'user', content: text, timestamp: Date.now() };
-                const resourceMessages = mcpClient
-                    ? await buildAttachedResourceMessages({
-                        selectedUris: attachedResourceUris,
-                        resources,
-                        readResource: (uri) => mcpClient.readResource(uri),
-                    })
-                    : [];
-                return [userMessage, ...resourceMessages];
+                const resourceMessages = await buildAttachedResourceMessages({
+                    selectedUris: attachedResourceUris,
+                    resources,
+                    readResource: handleReadResource,
+                });
+                return [...resourceMessages, userMessage];
             },
             upsertConversation,
             setActiveConversationId: setActiveConvId,
@@ -317,7 +325,14 @@ const ChatWidget = () => {
             await runChatAction({
                 activeConversation: activeConv,
                 createConversation,
-                prepareMessages: async () => builtMessages,
+                prepareMessages: async () => {
+                    const resourceMessages = await buildAttachedResourceMessages({
+                        selectedUris: attachedResourceUris,
+                        resources,
+                        readResource: handleReadResource,
+                    });
+                    return [...resourceMessages, ...builtMessages];
+                },
                 upsertConversation,
                 setActiveConversationId: setActiveConvId,
                 setLoading: setIsLoading,
@@ -351,7 +366,7 @@ const ChatWidget = () => {
                 const resourceMessages = await buildAttachedResourceMessages({
                     selectedUris: attachedResourceUris,
                     resources,
-                    readResource: (uri) => mcpClient.readResource(uri),
+                    readResource: handleReadResource,
                 });
                 const promptMessages = await applyPromptShortcutMessages({
                     name: promptName,

@@ -8,6 +8,7 @@ export type ToolForm = {
     description: string;
     path: string;
     execute: string;
+    inputSchemaStr: string;
 };
 
 export type PromptForm = {
@@ -16,6 +17,7 @@ export type PromptForm = {
     description: string;
     path: string;
     prompt: string;
+    argumentsStr: string;
 };
 
 export type ResourceForm = {
@@ -94,6 +96,7 @@ export function parseRepositoryToFormState(repo: McpSkillsRepository): McpSkills
         description: item.description || '',
         path: (item as any).path || '.*',
         execute: (item as any).execute || '',
+        inputSchemaStr: item.inputSchema ? JSON.stringify(item.inputSchema, null, 2) : '',
     }));
 
     const prompts = storedPrompts.map((item: StoredMcpPrompt, index) => ({
@@ -104,6 +107,7 @@ export function parseRepositoryToFormState(repo: McpSkillsRepository): McpSkills
         prompt: Array.isArray(item.messages) && item.messages[0]
             ? String((item.messages[0] as any)?.content?.text || '')
             : '',
+        argumentsStr: item.arguments ? JSON.stringify(item.arguments, null, 2) : '',
     }));
 
     const resources = storedResources.map((item: StoredMcpResource, index) => ({
@@ -138,12 +142,19 @@ export function parseRepositoryToFormState(repo: McpSkillsRepository): McpSkills
 function toStoredTools(items: ToolForm[]): StoredMcpTool[] {
     return items
         .filter((item) => item.name.trim())
-        .map((item) => ({
-            name: item.name.trim(),
-            description: item.description.trim() || undefined,
-            ...(item.execute.trim() ? { execute: item.execute.trim() } as any : {}),
-            path: normalizePath(item.path),
-        }));
+        .map((item) => {
+            let inputSchema;
+            try {
+                if (item.inputSchemaStr.trim()) inputSchema = JSON.parse(item.inputSchemaStr);
+            } catch (e) {}
+            return {
+                name: item.name.trim(),
+                description: item.description.trim() || undefined,
+                ...(item.execute.trim() ? { execute: item.execute.trim() } as any : {}),
+                path: normalizePath(item.path),
+                ...(inputSchema ? { inputSchema } : {}),
+            };
+        });
 }
 
 function toStoredPrompts(items: PromptForm[]): StoredMcpPrompt[] {
@@ -153,11 +164,16 @@ function toStoredPrompts(items: PromptForm[]): StoredMcpPrompt[] {
             const messages: Array<Record<string, unknown>> = item.prompt.trim()
                 ? [{ role: 'user', content: { type: 'text', text: item.prompt.trim() } }]
                 : [];
+            let args;
+            try {
+                if (item.argumentsStr.trim()) args = JSON.parse(item.argumentsStr);
+            } catch (e) {}
             return {
                 name: item.name.trim(),
                 description: item.description.trim() || undefined,
                 messages: messages.length > 0 ? messages : undefined,
                 path: normalizePath(item.path),
+                ...(args ? { arguments: args } : {}),
             };
         });
 }

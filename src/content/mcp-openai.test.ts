@@ -10,7 +10,7 @@ describe('mcp-openai helpers', () => {
                 description: 'Tool A description',
                 parameters: { type: 'object', properties: {} },
                 execute: async () => ({}),
-            },
+            } as any,
         ]);
 
         expect(tools).toEqual([
