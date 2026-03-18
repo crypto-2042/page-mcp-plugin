@@ -7,12 +7,33 @@ import {
     getEmptyFormState,
     parseRepositoryToFormState,
     type McpSkillsFormState,
+    type PromptArgumentForm,
     type PromptForm,
     type SkillItemForm,
+    type ToolInputFieldForm,
     type ToolForm,
     type ResourceForm,
 } from './mcp-skills-form.js';
 import './styles.css';
+
+function newToolInputFieldRow(): ToolInputFieldForm {
+    return {
+        id: `tool_input_${Math.random().toString(36).slice(2, 8)}`,
+        name: '',
+        description: '',
+        type: 'string',
+        required: false,
+    };
+}
+
+function newPromptArgumentRow(): PromptArgumentForm {
+    return {
+        id: `prompt_arg_${Math.random().toString(36).slice(2, 8)}`,
+        name: '',
+        description: '',
+        required: false,
+    };
+}
 
 function newToolRow(): ToolForm {
     return {
@@ -21,7 +42,7 @@ function newToolRow(): ToolForm {
         description: '',
         path: '.*',
         execute: '',
-        inputSchemaStr: '',
+        inputSchemaFields: [],
     };
 }
 
@@ -32,7 +53,7 @@ function newPromptRow(): PromptForm {
         description: '',
         path: '.*',
         prompt: '',
-        argumentsStr: '',
+        arguments: [],
     };
 }
 
@@ -280,14 +301,6 @@ const App: React.FC = () => {
     const saveToolModal = () => {
         if (!toolModalItem) return;
         if (!toolModalItem.name.trim()) return alert('Name is required');
-        
-        if (toolModalItem.inputSchemaStr.trim()) {
-            try {
-                JSON.parse(toolModalItem.inputSchemaStr);
-            } catch (e) {
-                return alert('Input Schema must be valid JSON');
-            }
-        }
 
         const { id } = toolModalItem;
         const index = form.tools.findIndex(i => i.id === id);
@@ -304,14 +317,6 @@ const App: React.FC = () => {
     const savePromptModal = () => {
         if (!promptModalItem) return;
         if (!promptModalItem.name.trim()) return alert('Name is required');
-        
-        if (promptModalItem.argumentsStr.trim()) {
-            try {
-                JSON.parse(promptModalItem.argumentsStr);
-            } catch (e) {
-                return alert('Arguments must be valid JSON');
-            }
-        }
 
         const { id } = promptModalItem;
         const index = form.prompts.findIndex(i => i.id === id);
@@ -539,8 +544,79 @@ const App: React.FC = () => {
                             <textarea className="glass-input" placeholder="() => { ... }" value={toolModalItem.execute} onChange={(e) => setToolModalItem({ ...toolModalItem, execute: e.target.value })} style={{ minHeight: 120, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }} />
                         </div>
                         <div className="form-group">
-                            <label className="input-label" style={{ display: 'block', marginBottom: 6, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Input Schema (JSON)</label>
-                            <textarea className="glass-input" placeholder='{"type": "object", "properties": {}}' value={toolModalItem.inputSchemaStr} onChange={(e) => setToolModalItem({ ...toolModalItem, inputSchemaStr: e.target.value })} style={{ minHeight: 80, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }} />
+                            <label className="input-label" style={{ display: 'block', marginBottom: 6, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Input Schema Fields</label>
+                            <div style={{ display: 'grid', gap: 8 }}>
+                                {toolModalItem.inputSchemaFields.length === 0 ? (
+                                    <p className="card-desc" style={{ margin: 0 }}>No input fields yet.</p>
+                                ) : toolModalItem.inputSchemaFields.map((field) => (
+                                    <div key={field.id} style={{ display: 'grid', gap: 8, border: '1px solid var(--s-border)', borderRadius: 8, padding: 10 }}>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 140px auto', gap: 8 }}>
+                                            <input
+                                                className="glass-input"
+                                                placeholder="Field name"
+                                                value={field.name}
+                                                onChange={(e) => setToolModalItem({
+                                                    ...toolModalItem,
+                                                    inputSchemaFields: toolModalItem.inputSchemaFields.map((item) => item.id === field.id ? { ...item, name: e.target.value } : item),
+                                                })}
+                                            />
+                                            <select
+                                                className="glass-input"
+                                                value={field.type}
+                                                onChange={(e) => setToolModalItem({
+                                                    ...toolModalItem,
+                                                    inputSchemaFields: toolModalItem.inputSchemaFields.map((item) => item.id === field.id ? { ...item, type: e.target.value as ToolInputFieldForm['type'] } : item),
+                                                })}
+                                            >
+                                                <option value="string">string</option>
+                                                <option value="number">number</option>
+                                                <option value="integer">integer</option>
+                                                <option value="boolean">boolean</option>
+                                                <option value="array">array</option>
+                                                <option value="object">object</option>
+                                            </select>
+                                            <button
+                                                className="btn btn-ghost"
+                                                type="button"
+                                                onClick={() => setToolModalItem({
+                                                    ...toolModalItem,
+                                                    inputSchemaFields: toolModalItem.inputSchemaFields.filter((item) => item.id !== field.id),
+                                                })}
+                                            >
+                                                Delete
+                                            </button>
+                                        </div>
+                                        <input
+                                            className="glass-input"
+                                            placeholder="Description"
+                                            value={field.description}
+                                            onChange={(e) => setToolModalItem({
+                                                ...toolModalItem,
+                                                inputSchemaFields: toolModalItem.inputSchemaFields.map((item) => item.id === field.id ? { ...item, description: e.target.value } : item),
+                                            })}
+                                        />
+                                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={field.required}
+                                                onChange={(e) => setToolModalItem({
+                                                    ...toolModalItem,
+                                                    inputSchemaFields: toolModalItem.inputSchemaFields.map((item) => item.id === field.id ? { ...item, required: e.target.checked } : item),
+                                                })}
+                                            />
+                                            Required
+                                        </label>
+                                    </div>
+                                ))}
+                                <button
+                                    className="btn btn-outline"
+                                    type="button"
+                                    style={{ width: 'fit-content' }}
+                                    onClick={() => setToolModalItem({ ...toolModalItem, inputSchemaFields: [...toolModalItem.inputSchemaFields, newToolInputFieldRow()] })}
+                                >
+                                    + Add field
+                                </button>
+                            </div>
                         </div>
 
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 }}>
@@ -578,8 +654,64 @@ const App: React.FC = () => {
                             <textarea className="glass-input" placeholder="Enter prompt text or template" value={promptModalItem.prompt} onChange={(e) => setPromptModalItem({ ...promptModalItem, prompt: e.target.value })} style={{ minHeight: 100 }} />
                         </div>
                         <div className="form-group">
-                            <label className="input-label" style={{ display: 'block', marginBottom: 6, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Arguments (JSON)</label>
-                            <textarea className="glass-input" placeholder='[{"name": "arg1", "description": "some arg", "required": true}]' value={promptModalItem.argumentsStr} onChange={(e) => setPromptModalItem({ ...promptModalItem, argumentsStr: e.target.value })} style={{ minHeight: 80, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }} />
+                            <label className="input-label" style={{ display: 'block', marginBottom: 6, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Arguments</label>
+                            <div style={{ display: 'grid', gap: 8 }}>
+                                {promptModalItem.arguments.length === 0 ? (
+                                    <p className="card-desc" style={{ margin: 0 }}>No arguments yet.</p>
+                                ) : promptModalItem.arguments.map((arg) => (
+                                    <div key={arg.id} style={{ display: 'grid', gap: 8, border: '1px solid var(--s-border)', borderRadius: 8, padding: 10 }}>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8 }}>
+                                            <input
+                                                className="glass-input"
+                                                placeholder="Argument name"
+                                                value={arg.name}
+                                                onChange={(e) => setPromptModalItem({
+                                                    ...promptModalItem,
+                                                    arguments: promptModalItem.arguments.map((item) => item.id === arg.id ? { ...item, name: e.target.value } : item),
+                                                })}
+                                            />
+                                            <button
+                                                className="btn btn-ghost"
+                                                type="button"
+                                                onClick={() => setPromptModalItem({
+                                                    ...promptModalItem,
+                                                    arguments: promptModalItem.arguments.filter((item) => item.id !== arg.id),
+                                                })}
+                                            >
+                                                Delete
+                                            </button>
+                                        </div>
+                                        <input
+                                            className="glass-input"
+                                            placeholder="Description"
+                                            value={arg.description}
+                                            onChange={(e) => setPromptModalItem({
+                                                ...promptModalItem,
+                                                arguments: promptModalItem.arguments.map((item) => item.id === arg.id ? { ...item, description: e.target.value } : item),
+                                            })}
+                                        />
+                                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={arg.required}
+                                                onChange={(e) => setPromptModalItem({
+                                                    ...promptModalItem,
+                                                    arguments: promptModalItem.arguments.map((item) => item.id === arg.id ? { ...item, required: e.target.checked } : item),
+                                                })}
+                                            />
+                                            Required
+                                        </label>
+                                    </div>
+                                ))}
+                                <button
+                                    className="btn btn-outline"
+                                    type="button"
+                                    style={{ width: 'fit-content' }}
+                                    onClick={() => setPromptModalItem({ ...promptModalItem, arguments: [...promptModalItem.arguments, newPromptArgumentRow()] })}
+                                >
+                                    + Add argument
+                                </button>
+                            </div>
                         </div>
 
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 }}>

@@ -14,7 +14,7 @@ describe('mcp skills local form mapping', () => {
         const form = getEmptyFormState();
         form.repositoryName = 'Local Repo';
         form.siteDomain = 'Shop.Example.com';
-        form.tools = [{ id: 't1', name: 'toolA', description: 'd', path: '', execute: 'return 1;', inputSchemaStr: '' }];
+        form.tools = [{ id: 't1', name: 'toolA', description: 'd', path: '', execute: 'return 1;', inputSchemaFields: [] }];
 
         const payload = buildRepositoryPayloadFromForm(form, null, 100, () => 'uuid-1');
 
@@ -96,8 +96,27 @@ describe('mcp skills local form mapping', () => {
             marketOrigin: 'local://mcp-skills',
             marketDetailUrl: '',
             mcp: {
-                tools: [{ name: 'tool-x', description: 'd1', execute: '() => 1', path: '^/x$' } as any],
-                prompts: [{ name: 'prompt-x', description: 'd2', messages: [{ role: 'user', content: { type: 'text', text: 'hello' } }], path: '^/p$' } as any],
+                tools: [{
+                    name: 'tool-x',
+                    description: 'd1',
+                    execute: '() => 1',
+                    path: '^/x$',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            selector: { type: 'string', description: 'CSS selector' },
+                            limit: { type: 'integer' },
+                        },
+                        required: ['selector'],
+                    },
+                } as any],
+                prompts: [{
+                    name: 'prompt-x',
+                    description: 'd2',
+                    messages: [{ role: 'user', content: { type: 'text', text: 'hello' } }],
+                    path: '^/p$',
+                    arguments: [{ name: 'tone', description: 'response tone', required: true }],
+                } as any],
                 resources: [{ uri: 'page://resource-x', name: 'resource-x', description: 'd3', mimeType: 'text/plain', path: '^/r$' } as any],
             },
             installSnapshot: {
@@ -144,7 +163,12 @@ describe('mcp skills local form mapping', () => {
         expect(form.skills).toHaveLength(1);
         expect((form.tools[0] as ToolForm).name).toBe('tool-x');
         expect((form.tools[0] as ToolForm).execute).toBe('() => 1');
+        expect((form.tools[0] as ToolForm).inputSchemaFields).toHaveLength(2);
+        expect((form.tools[0] as ToolForm).inputSchemaFields[0]?.name).toBe('selector');
+        expect((form.tools[0] as ToolForm).inputSchemaFields[0]?.required).toBe(true);
         expect((form.prompts[0] as PromptForm).prompt).toBe('hello');
+        expect((form.prompts[0] as PromptForm).arguments).toHaveLength(1);
+        expect((form.prompts[0] as PromptForm).arguments[0]?.name).toBe('tone');
         expect(form.resources[0]?.uri).toBe('page://resource-x');
         expect((form.skills[0] as SkillItemForm).skillMd).toBe('# S');
     });
@@ -153,11 +177,54 @@ describe('mcp skills local form mapping', () => {
         const form = getEmptyFormState();
         form.repositoryName = 'Local Repo';
         form.siteDomain = 'example.com';
-        form.prompts = [{ id: 'p1', name: 'promptA', description: '', path: '.*', prompt: 'hi', argumentsStr: '' }];
+        form.prompts = [{ id: 'p1', name: 'promptA', description: '', path: '.*', prompt: 'hi', arguments: [] }];
 
         const payload = buildRepositoryPayloadFromForm(form, null, 100, () => 'uuid-2');
 
         expect(payload.mcp.prompts).toHaveLength(1);
         expect((payload.mcp.prompts[0] as any).messages[0].content.text).toBe('hi');
+    });
+
+    it('serializes tool input schema and prompt arguments from form rows', () => {
+        const form = getEmptyFormState();
+        form.repositoryName = 'Local Repo';
+        form.siteDomain = 'example.com';
+        form.tools = [{
+            id: 't1',
+            name: 'extract_data',
+            description: '',
+            path: '.*',
+            execute: '() => {}',
+            inputSchemaFields: [
+                { id: 'f1', name: 'selector', description: 'CSS selector', type: 'string', required: true },
+                { id: 'f2', name: 'maxItems', description: '', type: 'integer', required: false },
+            ],
+        }];
+        form.prompts = [{
+            id: 'p1',
+            name: 'summarize',
+            description: '',
+            path: '.*',
+            prompt: 'summarize this',
+            arguments: [
+                { id: 'a1', name: 'lang', description: 'target language', required: true },
+                { id: 'a2', name: 'style', description: '', required: false },
+            ],
+        }];
+
+        const payload = buildRepositoryPayloadFromForm(form, null, 100, () => 'uuid-3');
+
+        expect((payload.mcp.tools[0] as any).inputSchema).toEqual({
+            type: 'object',
+            properties: {
+                selector: { type: 'string', description: 'CSS selector' },
+                maxItems: { type: 'integer' },
+            },
+            required: ['selector'],
+        });
+        expect((payload.mcp.prompts[0] as any).arguments).toEqual([
+            { name: 'lang', description: 'target language', required: true },
+            { name: 'style' },
+        ]);
     });
 });
