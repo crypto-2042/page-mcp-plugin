@@ -3,27 +3,33 @@ import { createRoot } from 'react-dom/client';
 import type { McpSkillsRepository, PluginSettings } from '../shared/types.js';
 import { DEFAULT_SETTINGS } from '../shared/types.js';
 import {
+    buildSchemaNodeSummary,
     buildRepositoryPayloadFromForm,
     getEmptyFormState,
+    parseEnumValuesText,
     parseRepositoryToFormState,
     type McpSkillsFormState,
     type PromptArgumentForm,
     type PromptForm,
     type SkillItemForm,
     type ToolInputFieldForm,
+    type ToolInputType,
     type ToolForm,
     type ResourceForm,
 } from './mcp-skills-form.js';
 import './styles.css';
 import { MaterialSymbolIcon } from './material-symbol-icon.js';
 
-function newToolInputFieldRow(): ToolInputFieldForm {
+function newToolInputFieldRow(type: ToolInputType = 'string'): ToolInputFieldForm {
     return {
         id: `tool_input_${Math.random().toString(36).slice(2, 8)}`,
         name: '',
         description: '',
-        type: 'string',
+        type,
         required: false,
+        enumValues: [],
+        properties: [],
+        items: null,
     };
 }
 
@@ -96,6 +102,44 @@ function skillHasExtraContent(item: SkillItemForm): boolean {
     return !!(item.description.trim() || item.path.trim() || item.skillMd.trim() || item.run.trim());
 }
 
+function mapSchemaNodes(
+    nodes: ToolInputFieldForm[],
+    targetId: string,
+    updater: (node: ToolInputFieldForm) => ToolInputFieldForm
+): ToolInputFieldForm[] {
+    return nodes.map((node) => {
+        if (node.id === targetId) return updater(node);
+        return {
+            ...node,
+            properties: mapSchemaNodes(node.properties, targetId, updater),
+            items: node.items ? mapSingleSchemaNode(node.items, targetId, updater) : null,
+        };
+    });
+}
+
+function mapSingleSchemaNode(
+    node: ToolInputFieldForm,
+    targetId: string,
+    updater: (node: ToolInputFieldForm) => ToolInputFieldForm
+): ToolInputFieldForm {
+    if (node.id === targetId) return updater(node);
+    return {
+        ...node,
+        properties: mapSchemaNodes(node.properties, targetId, updater),
+        items: node.items ? mapSingleSchemaNode(node.items, targetId, updater) : null,
+    };
+}
+
+function removeSchemaNode(nodes: ToolInputFieldForm[], targetId: string): ToolInputFieldForm[] {
+    return nodes
+        .filter((node) => node.id !== targetId)
+        .map((node) => ({
+            ...node,
+            properties: removeSchemaNode(node.properties, targetId),
+            items: node.items?.id === targetId ? null : (node.items ? mapSingleSchemaNode(node.items, targetId, (item) => item) : null),
+        }));
+}
+
 // Modal component overlay
 const ModalOverlay: React.FC<{ children: React.ReactNode; onClose: () => void }> = ({ children, onClose }) => (
     <div
@@ -131,6 +175,7 @@ const App: React.FC = () => {
     const [promptModalItem, setPromptModalItem] = useState<PromptForm | null>(null);
     const [resourceModalItem, setResourceModalItem] = useState<ResourceForm | null>(null);
     const [skillModalItem, setSkillModalItem] = useState<SkillItemForm | null>(null);
+    const [collapsedSchemaNodeIds, setCollapsedSchemaNodeIds] = useState<string[]>([]);
 
     const [settings, setSettings] = useState<PluginSettings>(DEFAULT_SETTINGS);
     const [dict, setDict] = useState<Record<string, { message: string }>>({});
@@ -313,6 +358,176 @@ const App: React.FC = () => {
             setField('tools', [...form.tools, toolModalItem]);
         }
         setToolModalItem(null);
+        setCollapsedSchemaNodeIds([]);
+    };
+
+    const updateToolSchemaNode = (targetId: string, updater: (node: ToolInputFieldForm) => ToolInputFieldForm) => {
+        if (!toolModalItem) return;
+        setToolModalItem({
+            ...toolModalItem,
+            inputSchemaFields: mapSchemaNodes(toolModalItem.inputSchemaFields, targetId, updater),
+        });
+    };
+
+    const deleteToolSchemaNode = (targetId: string) => {
+        if (!toolModalItem) return;
+        setToolModalItem({
+            ...toolModalItem,
+            inputSchemaFields: removeSchemaNode(toolModalItem.inputSchemaFields, targetId),
+        });
+    };
+
+    const renderSchemaNodeEditor = (field: ToolInputFieldForm, options?: { nested?: boolean; arrayItem?: boolean }): React.ReactNode => {
+        const nested = options?.nested ?? false;
+        const arrayItem = options?.arrayItem ?? false;
+        const supportsEnum = field.type !== 'object' && field.type !== 'array';
+        const collapsed = collapsedSchemaNodeIds.includes(field.id);
+
+        return (
+            <div key={field.id} style={{ display: 'grid', gap: 8, border: '1px solid var(--s-border)', borderRadius: 8, padding: 10, marginLeft: nested ? 12 : 0 }}>
+                <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={() => setCollapsedSchemaNodeIds((prev) => prev.includes(field.id) ? prev.filter((id) => id !== field.id) : [...prev, field.id])}
+                    style={{ justifyContent: 'space-between', display: 'flex', alignItems: 'center', padding: '6px 8px' }}
+                >
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <strong style={{ color: 'var(--s-text)' }}>{arrayItem ? '(array item)' : (field.name || '(unnamed)')}</strong>
+                        <span style={{ fontSize: '12px', color: 'var(--s-text-muted)' }}>{buildSchemaNodeSummary(field)}</span>
+                    </span>
+                    <MaterialSymbolIcon name="chevron_right" style={{ color: 'var(--s-text-muted)', transform: collapsed ? 'rotate(0deg)' : 'rotate(90deg)', transition: 'transform 0.2s ease' }} />
+                </button>
+                {!collapsed && (
+                    <>
+                <div style={{ display: 'grid', gridTemplateColumns: arrayItem ? '140px auto' : '1fr 140px auto', gap: 8 }}>
+                    {!arrayItem && (
+                        <input
+                            className="glass-input"
+                            placeholder="Field name"
+                            value={field.name}
+                            onChange={(e) => updateToolSchemaNode(field.id, (item) => ({ ...item, name: e.target.value }))}
+                        />
+                    )}
+                    <select
+                        className="glass-input"
+                        value={field.type}
+                        onChange={(e) => updateToolSchemaNode(field.id, (item) => {
+                            const nextType = e.target.value as ToolInputFieldForm['type'];
+                            return {
+                                ...item,
+                                type: nextType,
+                                enumValues: nextType === 'object' || nextType === 'array' ? [] : item.enumValues,
+                                properties: nextType === 'object' ? item.properties : [],
+                                items: nextType === 'array' ? (item.items ?? newToolInputFieldRow('string')) : null,
+                            };
+                        })}
+                    >
+                        <option value="string">string</option>
+                        <option value="number">number</option>
+                        <option value="integer">integer</option>
+                        <option value="boolean">boolean</option>
+                        <option value="array">array</option>
+                        <option value="object">object</option>
+                    </select>
+                    <button
+                        className="btn btn-ghost"
+                        type="button"
+                        onClick={() => deleteToolSchemaNode(field.id)}
+                    >
+                        Delete
+                    </button>
+                </div>
+                <input
+                    className="glass-input"
+                    placeholder="Description"
+                    value={field.description}
+                    onChange={(e) => updateToolSchemaNode(field.id, (item) => ({ ...item, description: e.target.value }))}
+                />
+                {!arrayItem && (
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                        <input
+                            type="checkbox"
+                            checked={field.required}
+                            onChange={(e) => updateToolSchemaNode(field.id, (item) => ({ ...item, required: e.target.checked }))}
+                        />
+                        Required
+                    </label>
+                )}
+
+                {supportsEnum && (
+                    <div style={{ display: 'grid', gap: 6 }}>
+                        <label className="input-label" style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Enum values (one per line)</label>
+                        <textarea
+                            className="glass-input"
+                            placeholder={field.type === 'string' ? 'e.g. asc\ndesc' : 'e.g. 1\n2\n3'}
+                            value={field.enumValues.join('\n')}
+                            onChange={(e) => updateToolSchemaNode(field.id, (item) => ({
+                                ...item,
+                                enumValues: parseEnumValuesText(e.target.value),
+                            }))}
+                            style={{ minHeight: 72, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}
+                        />
+                        {field.enumValues.length > 0 && (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                                {field.enumValues.map((value) => (
+                                    <span key={`${field.id}:${value}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 8px', borderRadius: 999, border: '1px solid var(--s-border)', background: 'var(--s-glass-card)', fontSize: '12px' }}>
+                                        <span>{value}</span>
+                                        <button
+                                            type="button"
+                                            className="btn btn-ghost"
+                                            onClick={() => updateToolSchemaNode(field.id, (item) => ({ ...item, enumValues: item.enumValues.filter((enumValue) => enumValue !== value) }))}
+                                            style={{ padding: 0, minWidth: 'auto', lineHeight: 1 }}
+                                        >
+                                            ×
+                                        </button>
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {field.type === 'object' && (
+                    <div style={{ display: 'grid', gap: 8 }}>
+                        <label className="input-label" style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Object properties</label>
+                        {field.properties.length === 0 ? (
+                            <p className="card-desc" style={{ margin: 0 }}>No nested properties yet.</p>
+                        ) : field.properties.map((child) => renderSchemaNodeEditor(child, { nested: true }))}
+                        <button
+                            className="btn btn-outline"
+                            type="button"
+                            style={{ width: 'fit-content' }}
+                            onClick={() => updateToolSchemaNode(field.id, (item) => ({
+                                ...item,
+                                properties: [...item.properties, newToolInputFieldRow()],
+                            }))}
+                        >
+                            + Add property
+                        </button>
+                    </div>
+                )}
+
+                {field.type === 'array' && (
+                    <div style={{ display: 'grid', gap: 8 }}>
+                        <label className="input-label" style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Array item schema</label>
+                        {field.items ? (
+                            renderSchemaNodeEditor(field.items, { nested: true, arrayItem: true })
+                        ) : (
+                            <button
+                                className="btn btn-outline"
+                                type="button"
+                                style={{ width: 'fit-content' }}
+                                onClick={() => updateToolSchemaNode(field.id, (item) => ({ ...item, items: newToolInputFieldRow('string') }))}
+                            >
+                                + Configure item schema
+                            </button>
+                        )}
+                    </div>
+                )}
+                    </>
+                )}
+            </div>
+        );
     };
 
     const savePromptModal = () => {
@@ -549,66 +764,7 @@ const App: React.FC = () => {
                             <div style={{ display: 'grid', gap: 8 }}>
                                 {toolModalItem.inputSchemaFields.length === 0 ? (
                                     <p className="card-desc" style={{ margin: 0 }}>No input fields yet.</p>
-                                ) : toolModalItem.inputSchemaFields.map((field) => (
-                                    <div key={field.id} style={{ display: 'grid', gap: 8, border: '1px solid var(--s-border)', borderRadius: 8, padding: 10 }}>
-                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 140px auto', gap: 8 }}>
-                                            <input
-                                                className="glass-input"
-                                                placeholder="Field name"
-                                                value={field.name}
-                                                onChange={(e) => setToolModalItem({
-                                                    ...toolModalItem,
-                                                    inputSchemaFields: toolModalItem.inputSchemaFields.map((item) => item.id === field.id ? { ...item, name: e.target.value } : item),
-                                                })}
-                                            />
-                                            <select
-                                                className="glass-input"
-                                                value={field.type}
-                                                onChange={(e) => setToolModalItem({
-                                                    ...toolModalItem,
-                                                    inputSchemaFields: toolModalItem.inputSchemaFields.map((item) => item.id === field.id ? { ...item, type: e.target.value as ToolInputFieldForm['type'] } : item),
-                                                })}
-                                            >
-                                                <option value="string">string</option>
-                                                <option value="number">number</option>
-                                                <option value="integer">integer</option>
-                                                <option value="boolean">boolean</option>
-                                                <option value="array">array</option>
-                                                <option value="object">object</option>
-                                            </select>
-                                            <button
-                                                className="btn btn-ghost"
-                                                type="button"
-                                                onClick={() => setToolModalItem({
-                                                    ...toolModalItem,
-                                                    inputSchemaFields: toolModalItem.inputSchemaFields.filter((item) => item.id !== field.id),
-                                                })}
-                                            >
-                                                Delete
-                                            </button>
-                                        </div>
-                                        <input
-                                            className="glass-input"
-                                            placeholder="Description"
-                                            value={field.description}
-                                            onChange={(e) => setToolModalItem({
-                                                ...toolModalItem,
-                                                inputSchemaFields: toolModalItem.inputSchemaFields.map((item) => item.id === field.id ? { ...item, description: e.target.value } : item),
-                                            })}
-                                        />
-                                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                                            <input
-                                                type="checkbox"
-                                                checked={field.required}
-                                                onChange={(e) => setToolModalItem({
-                                                    ...toolModalItem,
-                                                    inputSchemaFields: toolModalItem.inputSchemaFields.map((item) => item.id === field.id ? { ...item, required: e.target.checked } : item),
-                                                })}
-                                            />
-                                            Required
-                                        </label>
-                                    </div>
-                                ))}
+                                ) : toolModalItem.inputSchemaFields.map((field) => renderSchemaNodeEditor(field))}
                                 <button
                                     className="btn btn-outline"
                                     type="button"

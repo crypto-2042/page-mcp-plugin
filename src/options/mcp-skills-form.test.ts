@@ -4,6 +4,8 @@ import {
     buildRepositoryPayloadFromForm,
     getEmptyFormState,
     parseRepositoryToFormState,
+    buildSchemaNodeSummary,
+    parseEnumValuesText,
     type PromptForm,
     type SkillItemForm,
     type ToolForm,
@@ -166,6 +168,7 @@ describe('mcp skills local form mapping', () => {
         expect((form.tools[0] as ToolForm).inputSchemaFields).toHaveLength(2);
         expect((form.tools[0] as ToolForm).inputSchemaFields[0]?.name).toBe('selector');
         expect((form.tools[0] as ToolForm).inputSchemaFields[0]?.required).toBe(true);
+        expect((form.tools[0] as ToolForm).inputSchemaFields[0]?.enumValues).toEqual([]);
         expect((form.prompts[0] as PromptForm).prompt).toBe('hello');
         expect((form.prompts[0] as PromptForm).arguments).toHaveLength(1);
         expect((form.prompts[0] as PromptForm).arguments[0]?.name).toBe('tone');
@@ -196,8 +199,8 @@ describe('mcp skills local form mapping', () => {
             path: '.*',
             execute: '() => {}',
             inputSchemaFields: [
-                { id: 'f1', name: 'selector', description: 'CSS selector', type: 'string', required: true },
-                { id: 'f2', name: 'maxItems', description: '', type: 'integer', required: false },
+                { id: 'f1', name: 'selector', description: 'CSS selector', type: 'string', required: true, enumValues: [], properties: [], items: null },
+                { id: 'f2', name: 'maxItems', description: '', type: 'integer', required: false, enumValues: [], properties: [], items: null },
             ],
         }];
         form.prompts = [{
@@ -226,5 +229,182 @@ describe('mcp skills local form mapping', () => {
             { name: 'lang', description: 'target language', required: true },
             { name: 'style' },
         ]);
+    });
+
+    it('parses nested object/array schemas and enum values into recursive form nodes', () => {
+        const repo = {
+            id: 'repo_nested',
+            repositoryId: 'repo-nested',
+            repositoryName: 'Nested Repo',
+            siteDomain: 'nested.example.com',
+            release: 'local',
+            apiBase: '',
+            marketOrigin: 'local://mcp-skills',
+            marketDetailUrl: '',
+            mcp: {
+                tools: [{
+                    name: 'search',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            sort: { type: 'string', enum: ['asc', 'desc'] },
+                            filters: {
+                                type: 'array',
+                                items: {
+                                    type: 'object',
+                                    properties: {
+                                        field: { type: 'string' },
+                                        op: { type: 'string', enum: ['eq', 'in'] },
+                                    },
+                                    required: ['field'],
+                                },
+                            },
+                        },
+                        required: ['sort'],
+                    },
+                } as any],
+                prompts: [],
+                resources: [],
+            },
+            installSnapshot: {
+                repository: { id: 'repo-nested', name: 'Nested Repo', description: null, siteDomain: 'nested.example.com', author: { id: 'local', name: 'Local Author' }, starsCount: 0, usageCount: 0, lastActiveAt: null, latestReleaseVersion: 'local' },
+                release: { id: 'local-release', repositoryId: 'repo-nested', version: 'local', name: null, changelog: null, isLatest: true, createdAt: '2026-01-01T00:00:00.000Z' },
+                snapshot: { mcp: { tools: [], prompts: [], resources: [] }, skills: [] },
+                integrity: { algorithm: 'manual', digest: 'manual' },
+            },
+            enabled: true,
+            installedAt: 1,
+            updatedAt: 1,
+        } as McpSkillsRepository;
+
+        const form = parseRepositoryToFormState(repo);
+        const sortField = form.tools[0]!.inputSchemaFields.find((item) => item.name === 'sort')!;
+        const filtersField = form.tools[0]!.inputSchemaFields.find((item) => item.name === 'filters')!;
+
+        expect(sortField.enumValues).toEqual(['asc', 'desc']);
+        expect(filtersField.type).toBe('array');
+        expect(filtersField.items?.type).toBe('object');
+        expect(filtersField.items?.properties.map((item) => item.name)).toEqual(['field', 'op']);
+        expect(filtersField.items?.properties.find((item) => item.name === 'op')?.enumValues).toEqual(['eq', 'in']);
+    });
+
+    it('serializes nested object/array schemas and enums from recursive form nodes', () => {
+        const form = getEmptyFormState();
+        form.repositoryName = 'Nested Repo';
+        form.siteDomain = 'nested.example.com';
+        form.tools = [{
+            id: 't1',
+            name: 'search',
+            description: '',
+            path: '.*',
+            execute: '() => {}',
+            inputSchemaFields: [
+                {
+                    id: 'f1',
+                    name: 'sort',
+                    description: '',
+                    type: 'string',
+                    required: true,
+                    enumValues: ['asc', 'desc'],
+                    properties: [],
+                    items: null,
+                },
+                {
+                    id: 'f2',
+                    name: 'filters',
+                    description: 'filters to apply',
+                    type: 'array',
+                    required: false,
+                    enumValues: [],
+                    properties: [],
+                    items: {
+                        id: 'f2_item',
+                        name: '',
+                        description: '',
+                        type: 'object',
+                        required: false,
+                        enumValues: [],
+                        properties: [
+                            { id: 'f2_item_1', name: 'field', description: '', type: 'string', required: true, enumValues: [], properties: [], items: null },
+                            { id: 'f2_item_2', name: 'op', description: '', type: 'string', required: false, enumValues: ['eq', 'in'], properties: [], items: null },
+                        ],
+                        items: null,
+                    },
+                },
+            ],
+        }];
+
+        const payload = buildRepositoryPayloadFromForm(form, null, 100, () => 'uuid-4');
+
+        expect((payload.mcp.tools[0] as any).inputSchema).toEqual({
+            type: 'object',
+            properties: {
+                sort: { type: 'string', enum: ['asc', 'desc'] },
+                filters: {
+                    type: 'array',
+                    description: 'filters to apply',
+                    items: {
+                        type: 'object',
+                        properties: {
+                            field: { type: 'string' },
+                            op: { type: 'string', enum: ['eq', 'in'] },
+                        },
+                        required: ['field'],
+                    },
+                },
+            },
+            required: ['sort'],
+        });
+    });
+
+    it('parses enum textarea input into trimmed tag values', () => {
+        expect(parseEnumValuesText(' asc \n\ndesc\n  in-progress  ')).toEqual(['asc', 'desc', 'in-progress']);
+    });
+
+    it('builds compact summaries for recursive schema nodes', () => {
+        expect(buildSchemaNodeSummary({
+            id: 'o1',
+            name: 'filters',
+            description: '',
+            type: 'object',
+            required: false,
+            enumValues: [],
+            properties: [
+                { id: 'p1', name: 'field', description: '', type: 'string', required: true, enumValues: [], properties: [], items: null },
+                { id: 'p2', name: 'op', description: '', type: 'string', required: false, enumValues: ['eq', 'in'], properties: [], items: null },
+            ],
+            items: null,
+        })).toBe('object · 2 properties');
+
+        expect(buildSchemaNodeSummary({
+            id: 'a1',
+            name: 'filters',
+            description: '',
+            type: 'array',
+            required: false,
+            enumValues: [],
+            properties: [],
+            items: {
+                id: 'i1',
+                name: '',
+                description: '',
+                type: 'object',
+                required: false,
+                enumValues: [],
+                properties: [],
+                items: null,
+            },
+        })).toBe('array · item: object');
+
+        expect(buildSchemaNodeSummary({
+            id: 'e1',
+            name: 'sort',
+            description: '',
+            type: 'string',
+            required: true,
+            enumValues: ['asc', 'desc'],
+            properties: [],
+            items: null,
+        })).toBe('string · enum(2)');
     });
 });

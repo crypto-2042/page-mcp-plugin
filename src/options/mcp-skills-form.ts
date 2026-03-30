@@ -10,6 +10,9 @@ export type ToolInputFieldForm = {
     description: string;
     type: ToolInputType;
     required: boolean;
+    enumValues: string[];
+    properties: ToolInputFieldForm[];
+    items: ToolInputFieldForm | null;
 };
 
 export type PromptArgumentForm = {
@@ -65,6 +68,26 @@ export type McpSkillsFormState = {
     skills: SkillItemForm[];
 };
 
+export function parseEnumValuesText(value: string): string[] {
+    return value
+        .split('\n')
+        .map((item) => item.trim())
+        .filter(Boolean);
+}
+
+export function buildSchemaNodeSummary(field: ToolInputFieldForm): string {
+    if (field.type === 'object') {
+        return `object · ${field.properties.length} propert${field.properties.length === 1 ? 'y' : 'ies'}`;
+    }
+    if (field.type === 'array') {
+        return `array · item: ${field.items?.type || 'unset'}`;
+    }
+    if (field.enumValues.length > 0) {
+        return `${field.type} · enum(${field.enumValues.length})`;
+    }
+    return field.type;
+}
+
 function generateRowId(prefix: string, index: number): string {
     return `${prefix}_${index}_${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -102,20 +125,60 @@ function parseToolInputSchemaFields(inputSchema: Record<string, unknown> | undef
 
     return Object.entries(properties)
         .filter(([, value]) => value && typeof value === 'object')
-        .map(([name, value], fieldIndex) => {
-            const rawType = String((value as any).type || 'string');
-            const type: ToolInputType =
-                rawType === 'number' || rawType === 'integer' || rawType === 'boolean' || rawType === 'array' || rawType === 'object'
-                    ? rawType
-                    : 'string';
-            return {
-                id: generateRowId(`tool_input_${index}`, fieldIndex),
-                name,
-                description: String((value as any).description || ''),
-                type,
-                required: requiredSet.has(name),
-            };
-        });
+        .map(([name, value], fieldIndex) => parseToolSchemaNode(name, value, requiredSet.has(name), `tool_input_${index}`, fieldIndex));
+}
+
+function normalizeToolInputType(rawType: unknown): ToolInputType {
+    const value = String(rawType || 'string');
+    return value === 'number' || value === 'integer' || value === 'boolean' || value === 'array' || value === 'object'
+        ? value
+        : 'string';
+}
+
+function parseEnumValues(value: unknown): string[] {
+    if (!Array.isArray(value)) return [];
+    return value.map((item) => typeof item === 'string' ? item : JSON.stringify(item));
+}
+
+function parseToolSchemaNode(
+    name: string,
+    value: unknown,
+    required: boolean,
+    prefix: string,
+    index: number
+): ToolInputFieldForm {
+    const record = (value && typeof value === 'object') ? (value as Record<string, unknown>) : {};
+    const type = normalizeToolInputType(record.type);
+    const requiredSet = new Set(
+        Array.isArray(record.required)
+            ? record.required.filter((item): item is string => typeof item === 'string')
+            : []
+    );
+    const childProperties = (record.properties && typeof record.properties === 'object')
+        ? Object.entries(record.properties as Record<string, unknown>)
+            .filter(([, child]) => child && typeof child === 'object')
+            .map(([childName, childValue], childIndex) => parseToolSchemaNode(
+                childName,
+                childValue,
+                requiredSet.has(childName),
+                `${prefix}_${index}_prop`,
+                childIndex
+            ))
+        : [];
+    const childItems = record.items && typeof record.items === 'object'
+        ? parseToolSchemaNode('', record.items, false, `${prefix}_${index}_item`, 0)
+        : null;
+
+    return {
+        id: generateRowId(prefix, index),
+        name,
+        description: String(record.description || ''),
+        type,
+        required,
+        enumValues: parseEnumValues(record.enum),
+        properties: childProperties,
+        items: childItems,
+    };
 }
 
 function parsePromptArguments(argumentsList: StoredMcpPromptArgument[] | undefined, index: number): PromptArgumentForm[] {
@@ -136,10 +199,7 @@ function buildToolInputSchema(fields: ToolInputFieldForm[]): Record<string, unkn
     const required = normalized.filter((item) => item.required).map((item) => item.name.trim());
 
     for (const item of normalized) {
-        properties[item.name.trim()] = {
-            type: item.type,
-            ...(item.description.trim() ? { description: item.description.trim() } : {}),
-        };
+        properties[item.name.trim()] = buildToolSchemaNode(item);
     }
 
     return {
@@ -147,6 +207,53 @@ function buildToolInputSchema(fields: ToolInputFieldForm[]): Record<string, unkn
         properties,
         ...(required.length > 0 ? { required } : {}),
     };
+}
+
+function parseEnumLiteral(raw: string, type: ToolInputType): unknown {
+    const trimmed = raw.trim();
+    if (!trimmed) return undefined;
+    if (type === 'number' || type === 'integer') {
+        const value = Number(trimmed);
+        return Number.isFinite(value) ? value : trimmed;
+    }
+    if (type === 'boolean') {
+        if (trimmed === 'true') return true;
+        if (trimmed === 'false') return false;
+    }
+    try {
+        return JSON.parse(trimmed);
+    } catch {
+        return trimmed;
+    }
+}
+
+function buildToolSchemaNode(field: ToolInputFieldForm): Record<string, unknown> {
+    const schema: Record<string, unknown> = {
+        type: field.type,
+        ...(field.description.trim() ? { description: field.description.trim() } : {}),
+    };
+
+    const enumValues = field.enumValues
+        .map((item) => parseEnumLiteral(item, field.type))
+        .filter((item) => item !== undefined);
+    if (enumValues.length > 0) {
+        schema.enum = enumValues;
+    }
+
+    if (field.type === 'object') {
+        const childProperties = field.properties.filter((item) => item.name.trim());
+        schema.properties = Object.fromEntries(childProperties.map((item) => [item.name.trim(), buildToolSchemaNode(item)]));
+        const required = childProperties.filter((item) => item.required).map((item) => item.name.trim());
+        if (required.length > 0) {
+            schema.required = required;
+        }
+    }
+
+    if (field.type === 'array' && field.items) {
+        schema.items = buildToolSchemaNode(field.items);
+    }
+
+    return schema;
 }
 
 function buildPromptArguments(items: PromptArgumentForm[]): StoredMcpPromptArgument[] | undefined {
