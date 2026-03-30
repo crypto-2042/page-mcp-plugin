@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { addMarketOrigin, filterRemoteRepos, normalizeMarketOrigin, removeMarketOrigin, setRepoAllowWithoutConfirm } from './options-remote-services.js';
+import { DEFAULT_SETTINGS } from '../shared/types.js';
 
 describe('remote services filter', () => {
     const list = [
@@ -35,5 +36,11 @@ describe('remote services filter', () => {
         const next = setRepoAllowWithoutConfirm(list, 'repo-2', true);
         expect(next.find((item) => item.id === 'repo-1')?.allowWithoutConfirm).toBe(false);
         expect(next.find((item) => item.id === 'repo-2')?.allowWithoutConfirm).toBe(true);
+    });
+
+    it('provides default remote tool timeout and retry settings', () => {
+        expect(DEFAULT_SETTINGS.remoteToolTimeoutSeconds).toBe(60);
+        expect(DEFAULT_SETTINGS.remoteToolRetryEnabled).toBe(false);
+        expect(DEFAULT_SETTINGS.remoteToolMaxRetries).toBe(1);
     });
 });

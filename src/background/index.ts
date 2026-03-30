@@ -9,6 +9,7 @@ import { validateExternalInstall } from './background-install.js';
 import { deleteRemoteRepoById, toggleRemoteRepoEnabled } from './background-remote-repos.js';
 import { deleteMcpSkillsRepoById, toggleMcpSkillsRepoEnabled, upsertMcpSkillsRepo } from './background-mcp-skills-repos.js';
 import { buildProxyApiUrl } from './proxy-api.js';
+import { executeRemoteToolRequest } from './remote-tool-request.js';
 import { extractStreamEventsFromBuffer } from './stream-events.js';
 
 const PROXY_TIMEOUT_MS = 30000;
@@ -275,28 +276,12 @@ async function handleMessage(msg: PluginMessage, sender: chrome.runtime.MessageS
             if (!originOk) {
                 return { error: `Market origin not in allowed list: ${msg.marketOrigin}` };
             }
-            const toolUrl = `${msg.apiBase.replace(/\/+$/, '')}/repositories/${msg.repositoryId}/tools/${encodeURIComponent(msg.toolName)}/execute`;
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), PROXY_TIMEOUT_MS);
-                const response = await fetch(toolUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ args: msg.args }),
-                    signal: controller.signal,
-                }).finally(() => clearTimeout(timeoutId));
-                const data = await response.json().catch(() => ({}));
-                if (!response.ok) {
-                    const message = (data as any)?.error?.message || `HTTP ${response.status}`;
-                    return { error: message };
-                }
-                return { data };
-            } catch (error) {
-                if ((error as Error)?.name === 'AbortError') {
-                    return { error: `Remote tool request timeout after ${PROXY_TIMEOUT_MS}ms` };
-                }
-                return { error: (error as Error)?.message || 'Remote tool request failed' };
-            }
+            return executeRemoteToolRequest(fetch, settings, {
+                apiBase: msg.apiBase,
+                repositoryId: msg.repositoryId,
+                toolName: msg.toolName,
+                args: msg.args,
+            });
         }
         default:
             return { error: 'Unknown message type' };

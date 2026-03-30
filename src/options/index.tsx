@@ -222,6 +222,16 @@ const OptionsApp: React.FC = () => {
         updateSetting('allowedMarketOrigins', removeMarketOrigin(settings.allowedMarketOrigins, origin));
     };
 
+    const updateRemoteToolTimeoutSeconds = (value: string) => {
+        const parsed = Number.parseInt(value, 10);
+        updateSetting('remoteToolTimeoutSeconds', Number.isFinite(parsed) ? Math.max(1, parsed) : DEFAULT_SETTINGS.remoteToolTimeoutSeconds);
+    };
+
+    const updateRemoteToolMaxRetries = (value: string) => {
+        const parsed = Number.parseInt(value, 10);
+        updateSetting('remoteToolMaxRetries', Number.isFinite(parsed) ? Math.max(0, parsed) : DEFAULT_SETTINGS.remoteToolMaxRetries);
+    };
+
     const fetchModels = async () => {
         if (!settings.apiKey) {
             setModelsInfo({ models: [], status: t('modelFetchNoKey'), fetching: false, error: 'no-key' });
@@ -791,6 +801,63 @@ const OptionsApp: React.FC = () => {
                                     <span className="toggle-slider"></span>
                                 </label>
                             </div>
+                        </div>
+
+                        <div className="glass-card">
+                            <div className="card-section-title">
+                                <MaterialSymbolIcon name="speed" />
+                                <span>{t('remoteToolTimeoutTitle') || '工具调用超时与重试'}</span>
+                            </div>
+                            <p className="card-desc" style={{ marginTop: '10px', marginBottom: '12px' }}>
+                                {t('remoteToolTimeoutDesc') || '仅作用于远程工具调用，不影响模型请求。'}
+                            </p>
+
+                            <div className="form-group">
+                                <label className="input-label" style={{ display: 'block', marginBottom: 6, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                                    {t('remoteToolTimeoutSecondsLabel') || '超时时间（秒）'}
+                                </label>
+                                <input
+                                    type="number"
+                                    min={1}
+                                    step={1}
+                                    className="glass-input"
+                                    value={settings.remoteToolTimeoutSeconds}
+                                    onChange={(e) => updateRemoteToolTimeoutSeconds(e.target.value)}
+                                />
+                            </div>
+
+                            <div className="card-row" style={{ marginTop: '16px' }}>
+                                <div className="card-info">
+                                    <div>
+                                        <h3 className="card-title">{t('remoteToolRetryEnabledTitle') || '启用超时重试'}</h3>
+                                        <p className="card-desc">{t('remoteToolRetryEnabledDesc') || '仅当工具调用超时时自动重试。'}</p>
+                                    </div>
+                                </div>
+                                <label className="toggle">
+                                    <input
+                                        type="checkbox"
+                                        checked={settings.remoteToolRetryEnabled}
+                                        onChange={(e) => updateSetting('remoteToolRetryEnabled', e.target.checked)}
+                                    />
+                                    <span className="toggle-slider"></span>
+                                </label>
+                            </div>
+
+                            {settings.remoteToolRetryEnabled && (
+                                <div className="form-group" style={{ marginTop: '16px' }}>
+                                    <label className="input-label" style={{ display: 'block', marginBottom: 6, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                                        {t('remoteToolMaxRetriesLabel') || '最大重试次数'}
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        step={1}
+                                        className="glass-input"
+                                        value={settings.remoteToolMaxRetries}
+                                        onChange={(e) => updateRemoteToolMaxRetries(e.target.value)}
+                                    />
+                                </div>
+                            )}
                         </div>
 
                         <div className="glass-card">

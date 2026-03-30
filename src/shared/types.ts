@@ -54,6 +54,9 @@ export interface PluginSettings {
     // Features
     autoDetect: boolean;
     remoteLoadingEnabled: boolean;
+    remoteToolTimeoutSeconds: number;
+    remoteToolRetryEnabled: boolean;
+    remoteToolMaxRetries: number;
     allowedMarketOrigins: string[];
     alwaysInjectChat: boolean;
     injectChatOnResources: boolean;
@@ -220,6 +223,9 @@ export const DEFAULT_SETTINGS: PluginSettings = {
     position: 'bottom-right',
     autoDetect: true,
     remoteLoadingEnabled: true,
+    remoteToolTimeoutSeconds: 60,
+    remoteToolRetryEnabled: false,
+    remoteToolMaxRetries: 1,
     allowedMarketOrigins: ['https://market.page-mcp.org'],
     alwaysInjectChat: false,
     injectChatOnResources: true,

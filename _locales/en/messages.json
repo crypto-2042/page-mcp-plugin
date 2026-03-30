@@ -379,6 +379,24 @@
     "remoteLoadingSwitchDesc": {
         "message": "Load remote MCP/Skills from installed repositories on demand when opening pages."
     },
+    "remoteToolTimeoutTitle": {
+        "message": "Tool Timeout and Retry"
+    },
+    "remoteToolTimeoutDesc": {
+        "message": "Applies only to remote tool execution and does not affect model requests."
+    },
+    "remoteToolTimeoutSecondsLabel": {
+        "message": "Timeout (seconds)"
+    },
+    "remoteToolRetryEnabledTitle": {
+        "message": "Enable Timeout Retry"
+    },
+    "remoteToolRetryEnabledDesc": {
+        "message": "Automatically retry only when a remote tool request times out."
+    },
+    "remoteToolMaxRetriesLabel": {
+        "message": "Max Retry Count"
+    },
     "marketWhitelistTitle": {
         "message": "Market Origin Whitelist"
     },

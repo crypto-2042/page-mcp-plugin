@@ -379,6 +379,24 @@
     "remoteLoadingSwitchDesc": {
         "message": "打开页面时按需加载已安装仓库的远程 MCP/Skills。"
     },
+    "remoteToolTimeoutTitle": {
+        "message": "工具调用超时与重试"
+    },
+    "remoteToolTimeoutDesc": {
+        "message": "仅作用于远程工具调用，不影响模型请求。"
+    },
+    "remoteToolTimeoutSecondsLabel": {
+        "message": "超时时间（秒）"
+    },
+    "remoteToolRetryEnabledTitle": {
+        "message": "启用超时重试"
+    },
+    "remoteToolRetryEnabledDesc": {
+        "message": "仅当远程工具调用超时时自动重试。"
+    },
+    "remoteToolMaxRetriesLabel": {
+        "message": "最大重试次数"
+    },
     "marketWhitelistTitle": {
         "message": "市场源白名单"
     },
