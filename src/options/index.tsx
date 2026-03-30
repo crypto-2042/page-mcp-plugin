@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { DEFAULT_SETTINGS, PluginSettings, McpSkillsRepository } from '../shared/types.js';
+import { loadSettingsAndLocale } from '../shared/locale-loader.js';
 import './styles.css';
 import { addMarketOrigin, filterRemoteRepos, normalizeMarketOrigin, removeMarketOrigin, setRepoAllowWithoutConfirm } from './options-remote-services.js';
 import { MaterialSymbolIcon } from './material-symbol-icon.js';
@@ -27,29 +28,10 @@ const OptionsApp: React.FC = () => {
     const [testResult, setTestResult] = useState<{ msg: string, isError: boolean, isTesting: boolean } | null>(null);
 
     const [dict, setDict] = useState<Record<string, {message: string}>>({});
+    const [localeReady, setLocaleReady] = useState(false);
     
-    useEffect(() => {
-        const loadDict = async () => {
-            try {
-                const url = chrome.runtime.getURL('_locales/' + (settings?.language || 'zh') + '/messages.json');
-                const res = await fetch(url);
-                const data = await res.json();
-                setDict(data);
-            } catch (e) {
-                // fallback
-            }
-        };
-        loadDict();
-    }, [settings?.language]);
-
     const t = (key: string, subs?: Record<string, string> | any) => {
-        let msg = dict[key]?.message;
-        if (!msg) {
-            try {
-                msg = chrome.i18n.getMessage(key);
-            } catch (e) {}
-        }
-        msg = msg || key;
+        let msg = dict[key]?.message || key;
         if (subs && typeof subs === 'object' && !Array.isArray(subs)) {
             Object.entries(subs).forEach(([k, v]) => {
                 msg = msg.replace('{' + k + '}', String(v));
@@ -61,14 +43,23 @@ const OptionsApp: React.FC = () => {
 
 
     useEffect(() => {
+        let mounted = true;
         try {
-            chrome.storage.local.get('pageMcpSettings', (res) => {
-                const mem = { ...DEFAULT_SETTINGS, ...(res.pageMcpSettings || {}) };
-                setSettings(mem);
-                setSavedSettings(mem);
-            });
+            loadSettingsAndLocale()
+                .then(({ settings: mem, dict }) => {
+                    if (!mounted) return;
+                    setSettings(mem);
+                    setSavedSettings(mem);
+                    setDict(dict);
+                    setLocaleReady(true);
+                })
+                .catch(() => {
+                    if (!mounted) return;
+                    setLocaleReady(true);
+                });
         } catch (e) {
             console.warn('Fallback to DEFAULT_SETTINGS since chrome.storage is missing');
+            setLocaleReady(true);
         }
 
         applyTheme(settings.theme);
@@ -83,6 +74,16 @@ const OptionsApp: React.FC = () => {
                         setSettings(mem);
                         setSavedSettings(mem);
                     }
+                    loadSettingsAndLocale()
+                        .then(({ dict }) => {
+                            if (!mounted) return;
+                            setDict(dict);
+                            setLocaleReady(true);
+                        })
+                        .catch(() => {
+                            if (!mounted) return;
+                            setLocaleReady(true);
+                        });
                 }
                 // Detect any McpSkills repo storage change (both legacy single-key and new per-item keys)
                 const mcpSkillsChanged = Object.keys(changes).some(
@@ -110,6 +111,10 @@ const OptionsApp: React.FC = () => {
             }
         };
         loadMcpSkillsRepos();
+
+        return () => {
+            mounted = false;
+        };
     }, []);
 
     useEffect(() => {
@@ -276,6 +281,10 @@ const OptionsApp: React.FC = () => {
             setTestResult({ msg: `Error: ${err.message}`, isError: true, isTesting: false });
         }
     };
+
+    if (!localeReady) {
+        return <div id="app" />;
+    }
 
     return (
         <div className="settings-shell" id="app">

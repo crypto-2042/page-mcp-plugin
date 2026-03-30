@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { McpSkillsRepository, PluginSettings } from '../shared/types.js';
 import { DEFAULT_SETTINGS } from '../shared/types.js';
+import { loadSettingsAndLocale } from '../shared/locale-loader.js';
 import {
     buildSchemaNodeSummary,
     buildRepositoryPayloadFromForm,
@@ -179,6 +180,7 @@ const App: React.FC = () => {
 
     const [settings, setSettings] = useState<PluginSettings>(DEFAULT_SETTINGS);
     const [dict, setDict] = useState<Record<string, { message: string }>>({});
+    const [localeReady, setLocaleReady] = useState(false);
 
     const applyTheme = (theme: string) => {
         const root = document.documentElement;
@@ -197,42 +199,49 @@ const App: React.FC = () => {
     };
 
     useEffect(() => {
+        let mounted = true;
         try {
-            chrome.storage.local.get('pageMcpSettings', (res) => {
-                const mem = { ...DEFAULT_SETTINGS, ...(res.pageMcpSettings || {}) };
-                setSettings(mem);
-                applyTheme(mem.theme);
-                applyAccent(mem.accentColor);
-            });
+            loadSettingsAndLocale()
+                .then(({ settings: mem, dict }) => {
+                    if (!mounted) return;
+                    setSettings(mem);
+                    setDict(dict);
+                    applyTheme(mem.theme);
+                    applyAccent(mem.accentColor);
+                    setLocaleReady(true);
+                })
+                .catch(() => {
+                    if (!mounted) return;
+                    setLocaleReady(true);
+                });
             chrome.storage.onChanged.addListener((changes, area) => {
                 if (area === 'local' && changes.pageMcpSettings) {
                     const mem = { ...DEFAULT_SETTINGS, ...(changes.pageMcpSettings.newValue || {}) };
                     setSettings(mem);
                     applyTheme(mem.theme);
                     applyAccent(mem.accentColor);
+                    loadSettingsAndLocale()
+                        .then(({ dict }) => {
+                            if (!mounted) return;
+                            setDict(dict);
+                            setLocaleReady(true);
+                        })
+                        .catch(() => {
+                            if (!mounted) return;
+                            setLocaleReady(true);
+                        });
                 }
             });
-        } catch (e) { }
+        } catch (e) {
+            setLocaleReady(true);
+        }
+        return () => {
+            mounted = false;
+        };
     }, []);
 
-    useEffect(() => {
-        const loadDict = async () => {
-            try {
-                const url = chrome.runtime.getURL('_locales/' + (settings?.language || 'zh') + '/messages.json');
-                const res = await fetch(url);
-                const data = await res.json();
-                setDict(data);
-            } catch (e) { }
-        };
-        loadDict();
-    }, [settings?.language]);
-
     const t = (key: string, defaultText: string = '') => {
-        let msg = dict[key]?.message;
-        if (!msg) {
-            try { msg = chrome.i18n.getMessage(key); } catch (e) { }
-        }
-        return msg || defaultText || key;
+        return dict[key]?.message || defaultText || key;
     };
 
     const showToast = (msg: string) => {
@@ -581,6 +590,10 @@ const App: React.FC = () => {
         }
         setSkillModalItem(null);
     };
+
+    if (!localeReady) {
+        return <div />;
+    }
 
     return (
         <div className="settings-shell" style={{ minHeight: '100vh' }}>

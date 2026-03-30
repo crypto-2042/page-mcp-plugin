@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Settings, Search, MessageSquare, Terminal, FileText, Blocks, Expand, Shrink, X } from 'lucide-react';
 import './input.css';
+import { loadSettingsAndLocale } from '../shared/locale-loader.js';
 import { getSourceBadgeKind, getSourceBadgeText } from './popup-source.js';
 
 // Using chrome.i18n for localization
@@ -36,38 +37,11 @@ const App: React.FC = () => {
     const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
     const [dict, setDict] = useState<Record<string, LocaleEntry>>({});
-
-    useEffect(() => {
-        const loadDict = async () => {
-            try {
-                const lang = settings?.language || 'zh';
-                const url = chrome.runtime.getURL('_locales/' + lang + '/messages.json');
-                const res = await fetch(url);
-                const data = await res.json();
-                setDict(data);
-            } catch (e) {
-                // fallback
-            }
-        };
-        loadDict();
-    }, [settings?.language]);
+    const [localeReady, setLocaleReady] = useState(false);
 
     const t = (key: string, subs?: Record<string, string> | string[] | string | number) => {
         const entry = dict[key];
-        let msg = entry?.message;
-        const chromeSubs = Array.isArray(subs)
-            ? subs.map(String)
-            : (subs && typeof subs === 'object')
-                ? Object.values(subs).map(String)
-                : (subs !== undefined && subs !== null)
-                    ? [String(subs)]
-                    : undefined;
-        if (!msg) {
-            try {
-                msg = chrome.i18n.getMessage(key, chromeSubs as any);
-            } catch (e) { }
-        }
-        msg = msg || key;
+        let msg = entry?.message || key;
 
         if (Array.isArray(subs)) {
             const placeholders = entry?.placeholders || {};
@@ -98,12 +72,16 @@ const App: React.FC = () => {
 
 
     useEffect(() => {
+        let mounted = true;
         const fetchSettings = async () => {
             try {
-                const response = await chrome.runtime.sendMessage({ type: 'GET_SETTINGS' });
-                if (response?.settings) {
-                    setSettings(response.settings);
-                    const { theme, accentColor } = response.settings;
+                const { settings, dict } = await loadSettingsAndLocale();
+                if (!mounted) return;
+                setSettings(settings);
+                setDict(dict);
+                setLocaleReady(true);
+                if (settings) {
+                    const { theme, accentColor } = settings;
                     const root = document.documentElement;
                     if (theme === 'dark' || (theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
                         root.classList.add('dark');
@@ -116,6 +94,7 @@ const App: React.FC = () => {
                 }
             } catch (err) {
                 console.error('Failed to get settings:', err);
+                if (mounted) setLocaleReady(true);
             }
         };
 
@@ -139,6 +118,10 @@ const App: React.FC = () => {
 
         fetchSettings();
         fetchData();
+
+        return () => {
+            mounted = false;
+        };
     }, []);
 
     const toggleExpand = (section: string) => {
@@ -217,6 +200,10 @@ const App: React.FC = () => {
             </section>
         );
     };
+
+    if (!localeReady) {
+        return <div className="view-panel" />;
+    }
 
     return (
         <div className="flex flex-col h-full w-full overflow-hidden">
