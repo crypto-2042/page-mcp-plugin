@@ -299,4 +299,66 @@ describe('runMcpConversationTurn', () => {
         expect(toolMessage?.toolCalls?.[0]?.status).toBe('error');
         expect(toolMessage?.toolCalls?.[0]?.error).toBe('User canceled');
     });
+
+    it('stops the turn after a tool execution failure instead of requesting another round', async () => {
+        const updates: ChatMessage[][] = [];
+        const persisted: ChatMessage[][] = [];
+        const execute = vi.fn(async () => {
+            throw new Error('tool failed');
+        });
+
+        const streamCompletion = vi
+            .fn()
+            .mockImplementationOnce(async (_messages, onEvent) => {
+                onEvent({
+                    type: 'tool-call-delta',
+                    toolCalls: [{
+                        index: 0,
+                        id: 'call_1',
+                        type: 'function',
+                        function: {
+                            name: 'read_title',
+                            arguments: '{}',
+                        },
+                    }],
+                });
+            });
+
+        await runMcpConversationTurn({
+            conversationMessages: [
+                { id: 'user-1', role: 'user', content: 'read title', timestamp: 1 },
+            ],
+            buildExecutableTools: () => [{
+                openAiName: 'read_title',
+                displayName: 'read_title',
+                description: 'Read title',
+                parameters: { type: 'object', properties: {} },
+                execute,
+            } as any],
+            toOpenAiMessages: () => [{ role: 'user', content: 'read title' }],
+            buildOpenAiTools: () => [{
+                type: 'function' as const,
+                function: {
+                    name: 'read_title',
+                    description: 'Read title',
+                    parameters: { type: 'object', properties: {} },
+                },
+            }],
+            formatToolResult: (result) => JSON.stringify(result ?? null),
+            callCompletions: vi.fn(async () => ({ choices: [] })),
+            streamCompletion,
+            persistConversation: async (messages) => {
+                persisted.push(messages);
+            },
+            updateConversation: (messages) => {
+                updates.push(messages);
+            },
+        });
+
+        expect(streamCompletion).toHaveBeenCalledTimes(1);
+        const toolMessage = updates.flat().find((message) => message.role === 'tool');
+        expect(toolMessage?.toolCalls?.[0]?.status).toBe('error');
+        expect(toolMessage?.toolCalls?.[0]?.error).toBe('tool failed');
+        expect(persisted.at(-1)?.some((message) => message.role === 'tool' && message.toolCalls?.[0]?.error === 'tool failed')).toBe(true);
+    });
 });
