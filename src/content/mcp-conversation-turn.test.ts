@@ -6,6 +6,7 @@ describe('runMcpConversationTurn', () => {
     it('streams a final assistant response when no tool calls are requested', async () => {
         const updates: ChatMessage[][] = [];
         const persisted: ChatMessage[][] = [];
+        const streamCalls: any[] = [];
 
         await runMcpConversationTurn({
             conversationMessages: [
@@ -18,8 +19,9 @@ describe('runMcpConversationTurn', () => {
             callCompletions: vi.fn(async () => ({
                 choices: [{ message: { role: 'assistant' as const, content: 'fallback text' } }],
             })),
-            streamCompletion: async (_messages, onDelta) => {
-                onDelta('streamed');
+            streamCompletion: async (requestMessages, onEvent) => {
+                streamCalls.push(requestMessages);
+                onEvent({ type: 'text-delta', delta: 'streamed' });
             },
             persistConversation: async (messages) => {
                 persisted.push(messages);
@@ -32,6 +34,11 @@ describe('runMcpConversationTurn', () => {
         expect(updates.at(-1)?.at(-1)?.role).toBe('assistant');
         expect(updates.at(-1)?.at(-1)?.content).toBe('streamed');
         expect(persisted.at(-1)?.at(-1)?.content).toBe('streamed');
+        expect(streamCalls[0]?.[0]).toEqual(expect.objectContaining({
+            role: 'system',
+            content: expect.stringContaining('call get_current_time before answering'),
+        }));
+        expect(persisted.at(-1)?.some((message) => message.role === 'system' && message.content.includes('get_current_time'))).toBe(false);
     });
 
     it('records tool messages when the assistant requests tool calls', async () => {
@@ -58,30 +65,26 @@ describe('runMcpConversationTurn', () => {
                 },
             }],
             formatToolResult: (result) => JSON.stringify(result ?? null),
-            callCompletions: vi
+            callCompletions: vi.fn(async () => ({ choices: [] })),
+            streamCompletion: vi
                 .fn()
-                .mockResolvedValueOnce({
-                    choices: [{
-                        message: {
-                            role: 'assistant' as const,
-                            content: '',
-                            tool_calls: [{
-                                id: 'call_1',
-                                type: 'function',
-                                function: {
-                                    name: 'read_title',
-                                    arguments: '{}',
-                                },
-                            }],
-                        },
-                    }],
+                .mockImplementationOnce(async (_messages, onEvent) => {
+                    onEvent({
+                        type: 'tool-call-delta',
+                        toolCalls: [{
+                            index: 0,
+                            id: 'call_1',
+                            type: 'function',
+                            function: {
+                                name: 'read_title',
+                                arguments: '{}',
+                            },
+                        }],
+                    });
                 })
-                .mockResolvedValueOnce({
-                    choices: [{ message: { role: 'assistant' as const, content: 'done' } }],
+                .mockImplementationOnce(async (_messages, onEvent) => {
+                    onEvent({ type: 'text-delta', delta: 'done' });
                 }),
-            streamCompletion: async (_messages, onDelta) => {
-                onDelta('done');
-            },
             persistConversation: async () => {},
             updateConversation: (messages) => {
                 updates.push(messages);
@@ -91,6 +94,123 @@ describe('runMcpConversationTurn', () => {
         const toolMessage = updates.flat().find((message) => message.role === 'tool');
         expect(toolMessage?.toolCalls?.[0]?.name).toBe('read_title');
         expect(toolMessage?.toolCalls?.[0]?.result).toEqual({ title: 'Hello' });
+    });
+
+    it('preserves assistant text that appears before a tool call', async () => {
+        const updates: ChatMessage[][] = [];
+
+        await runMcpConversationTurn({
+            conversationMessages: [
+                { id: 'user-1', role: 'user', content: 'read title', timestamp: 1 },
+            ],
+            buildExecutableTools: () => [{
+                openAiName: 'read_title',
+                displayName: 'read_title',
+                description: 'Read title',
+                parameters: { type: 'object', properties: {} },
+                execute: async () => ({ title: 'Hello' }),
+            } as any],
+            toOpenAiMessages: () => [{ role: 'user', content: 'read title' }],
+            buildOpenAiTools: () => [{
+                type: 'function' as const,
+                function: {
+                    name: 'read_title',
+                    description: 'Read title',
+                    parameters: { type: 'object', properties: {} },
+                },
+            }],
+            formatToolResult: (result) => JSON.stringify(result ?? null),
+            callCompletions: vi.fn(async () => ({ choices: [] })),
+            streamCompletion: vi
+                .fn()
+                .mockImplementationOnce(async (_messages, onEvent) => {
+                    onEvent({ type: 'text-delta', delta: 'Let me check that first.' });
+                    onEvent({
+                        type: 'tool-call-delta',
+                        toolCalls: [{
+                            index: 0,
+                            id: 'call_1',
+                            type: 'function',
+                            function: {
+                                name: 'read_title',
+                                arguments: '{}',
+                            },
+                        }],
+                    });
+                })
+                .mockImplementationOnce(async (_messages, onEvent) => {
+                    onEvent({ type: 'text-delta', delta: 'done' });
+                }),
+            persistConversation: async () => {},
+            updateConversation: (messages) => {
+                updates.push(messages);
+            },
+        });
+
+        const assistantMessage = updates
+            .flat()
+            .find((message) => message.role === 'assistant' && message.content === 'Let me check that first.');
+        expect(assistantMessage?.content).toBe('Let me check that first.');
+    });
+
+    it('handles streamed tool-call rounds in a single pass', async () => {
+        const updates: ChatMessage[][] = [];
+        const persisted: ChatMessage[][] = [];
+        const execute = vi.fn(async () => ({ title: 'Hello' }));
+
+        const streamCompletion = vi
+            .fn()
+            .mockImplementationOnce(async (_messages, onEvent) => {
+                onEvent({ type: 'text-delta', delta: 'Let me check that first.' });
+                onEvent({
+                    type: 'tool-call-delta',
+                    toolCalls: [{
+                        index: 0,
+                        id: 'call_1',
+                        type: 'function',
+                        function: { name: 'read_title', arguments: '{}' },
+                    }],
+                });
+            })
+            .mockImplementationOnce(async (_messages, onEvent) => {
+                onEvent({ type: 'text-delta', delta: 'Done.' });
+            });
+
+        await runMcpConversationTurn({
+            conversationMessages: [
+                { id: 'user-1', role: 'user', content: 'read title', timestamp: 1 },
+            ],
+            buildExecutableTools: () => [{
+                openAiName: 'read_title',
+                displayName: 'read_title',
+                description: 'Read title',
+                parameters: { type: 'object', properties: {} },
+                execute,
+            } as any],
+            toOpenAiMessages: () => [{ role: 'user', content: 'read title' }],
+            buildOpenAiTools: () => [{
+                type: 'function' as const,
+                function: {
+                    name: 'read_title',
+                    description: 'Read title',
+                    parameters: { type: 'object', properties: {} },
+                },
+            }],
+            formatToolResult: (result) => JSON.stringify(result ?? null),
+            callCompletions: vi.fn(async () => ({ choices: [] })),
+            streamCompletion,
+            persistConversation: async (messages) => {
+                persisted.push(messages);
+            },
+            updateConversation: (messages) => {
+                updates.push(messages);
+            },
+        });
+
+        expect(streamCompletion).toHaveBeenCalledTimes(2);
+        expect(execute).toHaveBeenCalledWith({});
+        expect(updates.flat().find((message) => message.role === 'tool')?.toolCalls?.[0]?.result).toEqual({ title: 'Hello' });
+        expect(persisted.at(-1)?.at(-1)?.content).toBe('Done.');
     });
 
     it('persists a visible assistant error message when the turn fails', async () => {
@@ -146,30 +266,26 @@ describe('runMcpConversationTurn', () => {
                 },
             }],
             formatToolResult: (result) => JSON.stringify(result ?? null),
-            callCompletions: vi
+            callCompletions: vi.fn(async () => ({ choices: [] })),
+            streamCompletion: vi
                 .fn()
-                .mockResolvedValueOnce({
-                    choices: [{
-                        message: {
-                            role: 'assistant' as const,
-                            content: '',
-                            tool_calls: [{
-                                id: 'call_1',
-                                type: 'function',
-                                function: {
-                                    name: 'remote_tool',
-                                    arguments: '{}',
-                                },
-                            }],
-                        },
-                    }],
+                .mockImplementationOnce(async (_messages, onEvent) => {
+                    onEvent({
+                        type: 'tool-call-delta',
+                        toolCalls: [{
+                            index: 0,
+                            id: 'call_1',
+                            type: 'function',
+                            function: {
+                                name: 'remote_tool',
+                                arguments: '{}',
+                            },
+                        }],
+                    });
                 })
-                .mockResolvedValueOnce({
-                    choices: [{ message: { role: 'assistant' as const, content: 'done' } }],
+                .mockImplementationOnce(async (_messages, onEvent) => {
+                    onEvent({ type: 'text-delta', delta: 'done' });
                 }),
-            streamCompletion: async (_messages, onDelta) => {
-                onDelta('done');
-            },
             persistConversation: async () => {},
             updateConversation: (messages) => {
                 updates.push(messages);

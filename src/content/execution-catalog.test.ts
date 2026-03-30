@@ -9,6 +9,24 @@ vi.mock('./remote-tool-executor.js', () => ({
 import { executeRemoteToolInPage } from './remote-tool-executor.js';
 
 describe('buildExecutionCatalog', () => {
+    it('registers a built-in current time tool even without page tools', async () => {
+        const catalog = buildExecutionCatalog({
+            mcpClient: null,
+            tools: [],
+        });
+
+        const timeTool = catalog.find((item) => item.openAiName === 'get_current_time');
+        expect(timeTool?.displayName).toBe('get_current_time');
+        expect(timeTool?.parameters).toEqual({ type: 'object', properties: {} });
+        await expect(timeTool?.execute({})).resolves.toEqual(expect.objectContaining({
+            iso: expect.any(String),
+            localDateTime: expect.any(String),
+            timeZone: expect.any(String),
+            utcOffset: expect.any(String),
+            today: expect.any(String),
+        }));
+    });
+
     it('executes native tools via mcpClient.callTool', async () => {
         const callTool = vi.fn(async () => ({ ok: true }));
 
@@ -19,8 +37,9 @@ describe('buildExecutionCatalog', () => {
             ] as any,
         });
 
-        expect(catalog.map((item) => item.displayName)).toEqual(['native-tool']);
-        await catalog[0].execute({});
+        expect(catalog.map((item) => item.displayName)).toContain('native-tool');
+        const nativeTool = catalog.find((item) => item.displayName === 'native-tool');
+        await nativeTool!.execute({});
         expect(callTool).toHaveBeenCalledWith('native-tool', {});
     });
 
@@ -42,15 +61,16 @@ describe('buildExecutionCatalog', () => {
             ] as any,
         });
 
-        expect(catalog.map((item) => item.displayName)).toEqual(['remote-tool']);
+        expect(catalog.map((item) => item.displayName)).toContain('remote-tool');
 
-        await catalog[0].execute({ arg1: 'value1' });
+        const remoteTool = catalog.find((item) => item.displayName === 'remote-tool');
+        await remoteTool!.execute({ arg1: 'value1' });
         // Remote tools should NOT call mcpClient.callTool
         expect(callTool).not.toHaveBeenCalled();
         // Remote tools should go through the MAIN world bridge
         expect(executeRemoteToolInPage).toHaveBeenCalledWith(executeStr, { arg1: 'value1' });
-        expect(catalog[0].sourceType).toBe('remote');
-        expect(catalog[0].sourceRepositoryId).toBe('repo-1');
+        expect(remoteTool!.sourceType).toBe('remote');
+        expect(remoteTool!.sourceRepositoryId).toBe('repo-1');
     });
 
     it('skips remote tools without execute string', () => {
@@ -66,7 +86,8 @@ describe('buildExecutionCatalog', () => {
                 },
             ] as any,
         });
-        expect(catalog).toHaveLength(0);
+        expect(catalog).toHaveLength(1);
+        expect(catalog[0].displayName).toBe('get_current_time');
     });
 
     it('registers remote tools even when mcpClient is null', () => {
@@ -83,8 +104,27 @@ describe('buildExecutionCatalog', () => {
             ] as any,
         });
         // Remote tools should be registered even without a native mcpClient
-        expect(catalog).toHaveLength(1);
-        expect(catalog[0].displayName).toBe('remote-tool');
+        expect(catalog.map((item) => item.displayName)).toContain('remote-tool');
+    });
+
+    it('reserves get_current_time for the built-in tool when another tool collides', () => {
+        const catalog = buildExecutionCatalog({
+            mcpClient: { callTool: vi.fn() } as any,
+            tools: [
+                {
+                    name: 'get_current_time',
+                    description: 'Remote collision',
+                    sourceType: 'remote',
+                    sourceLabel: 'remote:x',
+                    execute: '(args) => args',
+                },
+            ] as any,
+        });
+
+        expect(catalog[0]?.openAiName).toBe('get_current_time');
+        expect(catalog[0]?.sourceType).toBe('native');
+        expect(catalog[1]?.displayName).toBe('get_current_time');
+        expect(catalog[1]?.openAiName).toBe('get_current_time_2');
     });
 
     it('returns empty catalog for native tools when mcpClient is null', () => {
@@ -94,6 +134,7 @@ describe('buildExecutionCatalog', () => {
                 { name: 'some-tool', description: 'Tool', sourceType: 'native', sourceLabel: 'native' },
             ] as any,
         });
-        expect(catalog).toHaveLength(0);
+        expect(catalog).toHaveLength(1);
+        expect(catalog[0].displayName).toBe('get_current_time');
     });
 });

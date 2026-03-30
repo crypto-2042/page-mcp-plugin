@@ -3,6 +3,7 @@ import type {
     AnthropicMcpTool,
 } from '@page-mcp/protocol';
 import { executeRemoteToolInPage } from './remote-tool-executor.js';
+import { getCurrentTime } from './time-tool.js';
 
 type SourceTagged = {
     sourceType: 'native' | 'remote';
@@ -69,6 +70,28 @@ export function buildExecutionCatalog(params: {
 }): ExecutableTool[] {
     const executableTools: ExecutableTool[] = [];
     const usedToolNames = new Set<string>();
+
+    executableTools.push({
+        openAiName: createUniqueToolName('get_current_time', usedToolNames),
+        displayName: 'get_current_time',
+        description: 'Get the current local date, time, timezone, UTC offset, and today date for this browser environment.',
+        parameters: { type: 'object', properties: {} },
+        outputSchema: {
+            type: 'object',
+            properties: {
+                iso: { type: 'string' },
+                localDateTime: { type: 'string' },
+                timeZone: { type: 'string' },
+                utcOffset: { type: 'string' },
+                today: { type: 'string' },
+            },
+            required: ['iso', 'localDateTime', 'timeZone', 'utcOffset', 'today'],
+            additionalProperties: false,
+        },
+        execute: async () => getCurrentTime(),
+        sourceType: 'native',
+        sourceLabel: 'builtin',
+    });
 
     for (const tool of params.tools) {
         if (tool.sourceType === 'remote') {

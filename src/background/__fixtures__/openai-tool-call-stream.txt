@@ -1,0 +1,6 @@
+data: {"choices":[{"delta":{"content":"Let me inspect the page first."}}]}
+data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"read_title","arguments":"{"}}]}}]}
+data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\"selector\":\"h1.title\","}}]}}]}
+data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\"trim\":true}"}}]}}]}
+data: [DONE]
+

@@ -25,12 +25,14 @@ import {
     toOpenAiConversationMessages,
     type OpenAiToolDefinition,
     type OpenAIChatMessage,
+    type OpenAIStreamEvent,
 } from './mcp-openai.js';
 import { filterRenderableMessages } from './chat-message-visibility.js';
 import { getToolCallResultPayload } from './tool-call-display.js';
 import { createMcpChatRuntime } from './mcp-chat-runtime.js';
 import { runChatAction } from './mcp-chat-actions.js';
 import { safeRuntimeMessage } from './safe-runtime.js';
+import { buildStreamRequestPayload } from './chat-stream.js';
 
 // Hooks
 import { usePluginSettings } from './hooks/use-settings.js';
@@ -85,6 +87,7 @@ function buildInlinePromptMessages(
 
 type StreamPortMessage =
     | { type: 'CHUNK'; delta: string }
+    | { type: 'TOOL_CALL_CHUNK'; toolCalls: Array<{ index: number; id?: string; type?: 'function'; function?: { name?: string; arguments?: string } }> }
     | { type: 'DONE' }
     | { type: 'ERROR'; error: string };
 
@@ -155,7 +158,7 @@ const ChatWidget = () => {
     // --- Stream Completion ---
     const streamCompletion = async (
         messages: OpenAIChatMessage[],
-        onDelta: (delta: string) => void,
+        onEvent: (event: OpenAIStreamEvent) => void,
         streamTools?: OpenAiToolDefinition[],
         signal?: AbortSignal,
     ): Promise<void> => {
@@ -180,7 +183,13 @@ const ChatWidget = () => {
                 if (!msg || typeof msg !== 'object') return;
                 if (msg.type === 'CHUNK') {
                     if (typeof msg.delta === 'string' && msg.delta.length > 0) {
-                        onDelta(msg.delta);
+                        onEvent({ type: 'text-delta', delta: msg.delta });
+                    }
+                    return;
+                }
+                if (msg.type === 'TOOL_CALL_CHUNK') {
+                    if (Array.isArray(msg.toolCalls) && msg.toolCalls.length > 0) {
+                        onEvent({ type: 'tool-call-delta', toolCalls: msg.toolCalls });
                     }
                     return;
                 }
@@ -196,12 +205,11 @@ const ChatWidget = () => {
             port.postMessage({
                 type: 'START_STREAM',
                 endpoint: '/chat/completions',
-                payload: {
+                payload: buildStreamRequestPayload({
                     model: settings.model,
                     messages,
-                    stream: true,
-                    ...(streamTools && streamTools.length > 0 ? { tools: streamTools } : {}),
-                },
+                    tools: streamTools,
+                }),
             });
         });
     };

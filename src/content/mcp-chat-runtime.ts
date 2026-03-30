@@ -4,6 +4,7 @@ import type {
     OpenAiToolDefinition,
     OpenAIChatCompletionResponse,
     OpenAIChatMessage,
+    OpenAIStreamEvent,
 } from './mcp-openai.js';
 import type { AnthropicMcpTool } from '@page-mcp/protocol';
 import type { PageMcpClient } from '@page-mcp/core';
@@ -27,7 +28,7 @@ export function createMcpChatRuntime(params: {
     toOpenAiMessages: (messages: ChatMessage[]) => OpenAIChatMessage[];
     formatToolResult: (result: unknown, outputSchema?: unknown) => string;
     safeRuntimeMessage: <T>(context: string, payload: unknown) => Promise<T | undefined>;
-    streamCompletion: (messages: OpenAIChatMessage[], onDelta: (delta: string) => void, tools?: OpenAiToolDefinition[], signal?: AbortSignal) => Promise<void>;
+    streamCompletion: (messages: OpenAIChatMessage[], onEvent: (event: OpenAIStreamEvent) => void, tools?: OpenAiToolDefinition[], signal?: AbortSignal) => Promise<void>;
     confirmRemoteTool?: (tool: ExecutableTool, args: Record<string, unknown>) => Promise<boolean>;
     runConversationTurn?: typeof runMcpConversationTurn;
 }) {

@@ -32,7 +32,7 @@
     --s-radius-lg: 28px;
     --s-radius-full: 999px;
     --s-transition: 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-    --s-font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    --s-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
     --s-blur: 48px;
     --s-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.6);
     --s-shadow-hover: 0 30px 60px -12px rgba(0, 0, 0, 0.8);

@@ -5,7 +5,7 @@
     --color-primary: #3994ef;
     --color-background-light: #f6f7f8;
     --color-background-dark: #101922;
-    --font-display: "Inter", sans-serif;
+    --font-display: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
 }
 
 @layer utilities {
@@ -30,7 +30,7 @@
 }
 
 body {
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-display);
 }
 
 /* Tab Active Styles Extraction Since Tailwind plugin/forms is missing */

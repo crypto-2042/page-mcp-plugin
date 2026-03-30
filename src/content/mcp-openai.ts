@@ -19,6 +19,20 @@ export type OpenAIToolCall = {
     };
 };
 
+export type OpenAIToolCallDelta = {
+    index: number;
+    id?: string;
+    type?: 'function';
+    function?: {
+        name?: string;
+        arguments?: string;
+    };
+};
+
+export type OpenAIStreamEvent =
+    | { type: 'text-delta'; delta: string }
+    | { type: 'tool-call-delta'; toolCalls: OpenAIToolCallDelta[] };
+
 export type OpenAIChatMessage =
     | { role: 'user' | 'assistant' | 'system'; content: string; tool_calls?: OpenAIToolCall[] }
     | { role: 'tool'; content: string; tool_call_id: string };

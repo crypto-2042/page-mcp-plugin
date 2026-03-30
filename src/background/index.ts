@@ -9,6 +9,7 @@ import { validateExternalInstall } from './background-install.js';
 import { deleteRemoteRepoById, toggleRemoteRepoEnabled } from './background-remote-repos.js';
 import { deleteMcpSkillsRepoById, toggleMcpSkillsRepoEnabled, upsertMcpSkillsRepo } from './background-mcp-skills-repos.js';
 import { buildProxyApiUrl } from './proxy-api.js';
+import { extractStreamEventsFromBuffer } from './stream-events.js';
 
 const PROXY_TIMEOUT_MS = 30000;
 const AI_STREAM_PORT = 'PMCP_AI_STREAM';
@@ -101,28 +102,17 @@ chrome.runtime.onConnect.addListener((port) => {
                 const { done, value } = await reader.read();
                 if (done) break;
                 buffer += decoder.decode(value, { stream: true });
-
-                const lines = buffer.split('\n');
-                buffer = lines.pop() || '';
-
-                for (const rawLine of lines) {
-                    const line = rawLine.trim();
-                    if (!line || !line.startsWith('data:')) continue;
-                    const chunk = line.slice(5).trim();
-                    if (!chunk) continue;
-                    if (chunk === '[DONE]') {
-                        port.postMessage({ type: 'DONE' });
+                try {
+                    const result = extractStreamEventsFromBuffer(buffer);
+                    buffer = result.remainder;
+                    for (const event of result.events) {
+                        port.postMessage(event);
+                    }
+                    if (result.done) {
                         return;
                     }
-                    try {
-                        const parsed = JSON.parse(chunk);
-                        const delta = parsed?.choices?.[0]?.delta?.content;
-                        if (typeof delta === 'string' && delta.length > 0) {
-                            port.postMessage({ type: 'CHUNK', delta });
-                        }
-                    } catch {
-                        // Ignore malformed partial chunks
-                    }
+                } catch {
+                    // Ignore malformed partial chunks
                 }
             }
 

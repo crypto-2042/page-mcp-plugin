@@ -15,6 +15,7 @@ import {
     type ResourceForm,
 } from './mcp-skills-form.js';
 import './styles.css';
+import { MaterialSymbolIcon } from './material-symbol-icon.js';
 
 function newToolInputFieldRow(): ToolInputFieldForm {
     return {
@@ -386,7 +387,7 @@ const App: React.FC = () => {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
                         {/* Repository Form */}
                         <div className="glass-card">
-                            <div className="card-section-title"><span className="material-symbols-outlined">badge</span><span>{t('repositoryTitle', 'Repository')}</span></div>
+                            <div className="card-section-title"><MaterialSymbolIcon name="badge" /><span>{t('repositoryTitle', 'Repository')}</span></div>
                             <div style={{ display: 'grid', gap: 16, marginTop: 12 }}>
                                 <div className="form-group">
                                     <label className="input-label" style={{ display: 'block', marginBottom: 6, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{t('repoNameLabel', 'Repository Name')}</label>
@@ -407,7 +408,7 @@ const App: React.FC = () => {
                         <div className="glass-card">
                             <div className="card-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <span className="material-symbols-outlined">build</span><span>Tools</span>
+                                    <MaterialSymbolIcon name="build" /><span>Tools</span>
                                 </div>
                                 <button className="btn btn-outline" style={{ padding: '4px 12px', fontSize: 13 }} onClick={() => setToolModalItem(newToolRow())}>+ Add tool</button>
                             </div>
@@ -423,7 +424,7 @@ const App: React.FC = () => {
                                                 </div>
                                                 <div style={{ fontSize: 13, color: 'var(--s-text-secondary)', marginTop: 4 }}>{item.description || t('noDesc', 'No description')}</div>
                                             </div>
-                                            <span className="material-symbols-outlined" style={{ color: 'var(--s-text-muted)' }}>chevron_right</span>
+                                            <MaterialSymbolIcon name="chevron_right" style={{ color: 'var(--s-text-muted)' }} />
                                         </div>
                                     ))}
                                 </div>
@@ -434,7 +435,7 @@ const App: React.FC = () => {
                         <div className="glass-card" style={{ marginTop: 24 }}>
                             <div className="card-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <span className="material-symbols-outlined">chat</span><span>Prompts</span>
+                                    <MaterialSymbolIcon name="chat" /><span>Prompts</span>
                                 </div>
                                 <button className="btn btn-outline" style={{ padding: '4px 12px', fontSize: 13 }} onClick={() => setPromptModalItem(newPromptRow())}>+ Add prompt</button>
                             </div>
@@ -450,7 +451,7 @@ const App: React.FC = () => {
                                                 </div>
                                                 <div style={{ fontSize: 13, color: 'var(--s-text-secondary)', marginTop: 4 }}>{item.description || t('noDesc', 'No description')}</div>
                                             </div>
-                                            <span className="material-symbols-outlined" style={{ color: 'var(--s-text-muted)' }}>chevron_right</span>
+                                            <MaterialSymbolIcon name="chevron_right" style={{ color: 'var(--s-text-muted)' }} />
                                         </div>
                                     ))}
                                 </div>
@@ -461,7 +462,7 @@ const App: React.FC = () => {
                         <div className="glass-card" style={{ marginTop: 24 }}>
                             <div className="card-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <span className="material-symbols-outlined">inventory_2</span><span>Resources</span>
+                                    <MaterialSymbolIcon name="inventory_2" /><span>Resources</span>
                                 </div>
                                 <button className="btn btn-outline" style={{ padding: '4px 12px', fontSize: 13 }} onClick={() => setResourceModalItem(newResourceRow())}>+ Add resource</button>
                             </div>
@@ -477,7 +478,7 @@ const App: React.FC = () => {
                                                 </div>
                                                 <div style={{ fontSize: 13, color: 'var(--s-text-secondary)', marginTop: 4 }}>{item.description || t('noDesc', 'No description')}</div>
                                             </div>
-                                            <span className="material-symbols-outlined" style={{ color: 'var(--s-text-muted)' }}>chevron_right</span>
+                                            <MaterialSymbolIcon name="chevron_right" style={{ color: 'var(--s-text-muted)' }} />
                                         </div>
                                     ))}
                                 </div>
@@ -488,7 +489,7 @@ const App: React.FC = () => {
                         <div className="glass-card">
                             <div className="card-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <span className="material-symbols-outlined">terminal</span><span>{t('skillsTitle', 'Skills')}</span>
+                                    <MaterialSymbolIcon name="terminal" /><span>{t('skillsTitle', 'Skills')}</span>
                                 </div>
                                 <button className="btn btn-outline" style={{ padding: '4px 12px', fontSize: 13 }} onClick={() => setSkillModalItem(newSkillRow())}>+ {t('addSkillBtn', 'Add Skill')}</button>
                             </div>
@@ -505,7 +506,7 @@ const App: React.FC = () => {
                                                 </div>
                                                 <div style={{ fontSize: 13, color: 'var(--s-text-secondary)', marginTop: 4 }}>{item.description || t('noDesc', 'No description')}</div>
                                             </div>
-                                            <span className="material-symbols-outlined" style={{ color: 'var(--s-text-muted)' }}>chevron_right</span>
+                                            <MaterialSymbolIcon name="chevron_right" style={{ color: 'var(--s-text-muted)' }} />
                                         </div>
                                     ))}
                                 </div>

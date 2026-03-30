@@ -66,7 +66,7 @@ function generateCssVariables(theme: Theme, accentColor: string): string {
             --pmcp-blur-heavy: 80px;
             --pmcp-transition: 0.3s cubic-bezier(0.16, 1, 0.3, 1);
             --pmcp-transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-            --pmcp-font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            --pmcp-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
             ${themeVars}
 
             all: initial;

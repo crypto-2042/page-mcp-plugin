@@ -5,9 +5,10 @@ import type {
     OpenAiToolDefinition,
     OpenAIChatCompletionResponse,
     OpenAIChatMessage,
-    OpenAIResponseMessage,
-    OpenAIToolCall,
+    OpenAIStreamEvent,
 } from './mcp-openai.js';
+import { accumulateToolCallDeltas } from './chat-stream.js';
+import { buildTimeSensitivitySystemMessage } from './time-instruction.js';
 
 function createToolMessage(params: {
     toolCallId: string;
@@ -41,7 +42,7 @@ export async function runMcpConversationTurn(params: {
     buildOpenAiTools: (tools: ExecutableTool[]) => OpenAiToolDefinition[];
     formatToolResult: (result: unknown, outputSchema?: unknown) => string;
     callCompletions: (messages: OpenAIChatMessage[], signal?: AbortSignal) => Promise<OpenAIChatCompletionResponse>;
-    streamCompletion: (messages: OpenAIChatMessage[], onDelta: (delta: string) => void, tools?: OpenAiToolDefinition[], signal?: AbortSignal) => Promise<void>;
+    streamCompletion: (messages: OpenAIChatMessage[], onEvent: (event: OpenAIStreamEvent) => void, tools?: OpenAiToolDefinition[], signal?: AbortSignal) => Promise<void>;
     updateConversation: (messages: ChatMessage[]) => void;
     persistConversation: (messages: ChatMessage[]) => Promise<void>;
     confirmRemoteTool?: (tool: ExecutableTool, args: Record<string, unknown>) => Promise<boolean>;
@@ -53,156 +54,149 @@ export async function runMcpConversationTurn(params: {
         const toolIndex = new Map(executableTools.map((tool) => [tool.openAiName, tool]));
         const openAiTools = params.buildOpenAiTools(executableTools);
 
-        const requestMessages = params.toOpenAiMessages(messages);
+        const requestMessages = [
+            buildTimeSensitivitySystemMessage(),
+            ...params.toOpenAiMessages(messages),
+        ];
         let workingMessages: OpenAIChatMessage[] = [...requestMessages];
-        let responseMessage: OpenAIResponseMessage | undefined;
+        const maxToolRounds = openAiTools.length > 0 ? 4 : 1;
+        for (let toolRound = 0; toolRound < maxToolRounds; toolRound += 1) {
+            let assistantMessageId: string | null = null;
+            let streamedText = '';
+            const streamedToolCallDeltas: Array<{ index: number; id?: string; type?: 'function'; function?: { name?: string; arguments?: string } }> = [];
 
-        if (openAiTools.length > 0) {
-            let data = await params.callCompletions(workingMessages, params.signal);
-            responseMessage = data?.choices?.[0]?.message;
-            const maxToolRounds = 4;
-            let toolRound = 0;
-            while (toolRound < maxToolRounds) {
-                const toolCalls = Array.isArray(responseMessage?.tool_calls) ? responseMessage.tool_calls : [];
-                if (toolCalls.length === 0) break;
-
-                workingMessages.push({
-                    role: 'assistant',
-                    content: responseMessage?.content || '',
-                    tool_calls: toolCalls,
-                });
-
-                const toolMessages: ChatMessage[] = [];
-                for (const call of toolCalls) {
-                    if (call?.type !== 'function' || !call.function?.name) continue;
-                    const toolCallId = call.id || generateToolCallId();
-                    let args: Record<string, unknown> = {};
-                    try {
-                        args = call.function.arguments ? JSON.parse(call.function.arguments) : {};
-                    } catch (parseError) {
-                        throw new Error(`Invalid tool arguments for ${call.function.name}: ${(parseError as Error).message}`);
+            await params.streamCompletion(workingMessages, (event) => {
+                if (event.type === 'text-delta') {
+                    streamedText += event.delta;
+                    if (!assistantMessageId) {
+                        assistantMessageId = generateMessageId();
+                        messages = [...messages, {
+                            id: assistantMessageId,
+                            role: 'assistant',
+                            content: '',
+                            timestamp: Date.now(),
+                        }];
                     }
-
-                    const executable = toolIndex.get(call.function.name);
-                    if (!executable) {
-                        const errorText = `Tool not found: ${call.function.name}`;
-                        workingMessages.push({
-                            role: 'tool',
-                            tool_call_id: toolCallId,
-                            content: JSON.stringify({ error: errorText }),
-                        });
-                        toolMessages.push(createToolMessage({
-                            toolCallId,
-                            toolName: call.function.name,
-                            displayName: call.function.name,
-                            args,
-                            status: 'error',
-                            error: errorText,
-                        }));
-                        continue;
-                    }
-
-                    try {
-                        if (executable.sourceType === 'remote' && params.confirmRemoteTool) {
-                            const allowed = await params.confirmRemoteTool(executable, args);
-                            if (!allowed) {
-                                const errorText = 'User canceled';
-                                workingMessages.push({
-                                    role: 'tool',
-                                    tool_call_id: toolCallId,
-                                    content: JSON.stringify({ error: errorText }),
-                                });
-                                toolMessages.push(createToolMessage({
-                                    toolCallId,
-                                    toolName: call.function.name,
-                                    displayName: executable.displayName,
-                                    args,
-                                    status: 'error',
-                                    error: errorText,
-                                }));
-                                continue;
-                            }
-                        }
-
-                        const result = await executable.execute(args);
-                        const toolResultText = params.formatToolResult(result, executable.outputSchema);
-                        workingMessages.push({
-                            role: 'tool',
-                            tool_call_id: toolCallId,
-                            content: toolResultText,
-                        });
-                        toolMessages.push(createToolMessage({
-                            toolCallId,
-                            toolName: call.function.name,
-                            displayName: executable.displayName,
-                            args,
-                            status: 'success',
-                            result,
-                        }));
-                    } catch (toolError) {
-                        const errorText = (toolError as Error)?.message || String(toolError);
-                        workingMessages.push({
-                            role: 'tool',
-                            tool_call_id: toolCallId,
-                            content: JSON.stringify({ error: errorText }),
-                        });
-                        toolMessages.push(createToolMessage({
-                            toolCallId,
-                            toolName: call.function.name,
-                            displayName: executable.displayName,
-                            args,
-                            status: 'error',
-                            error: errorText,
-                        }));
-                    }
-                }
-
-                if (toolMessages.length > 0) {
-                    messages = [...messages, ...toolMessages];
+                    messages = messages.map((message) => (
+                        message.id === assistantMessageId
+                            ? { ...message, content: streamedText }
+                            : message
+                    ));
                     params.updateConversation(messages);
+                    return;
                 }
 
-                data = await params.callCompletions(workingMessages, params.signal);
-                responseMessage = data?.choices?.[0]?.message;
-                toolRound += 1;
+                streamedToolCallDeltas.push(...event.toolCalls);
+            }, openAiTools.length > 0 ? openAiTools : undefined, params.signal);
+
+            const toolCalls = accumulateToolCallDeltas(streamedToolCallDeltas);
+            if (toolCalls.length === 0) {
+                await params.persistConversation(messages);
+                return messages;
             }
-            if (Array.isArray(responseMessage?.tool_calls) && responseMessage.tool_calls.length > 0) {
-                throw new Error('Tool-call rounds exceeded limit (4)');
+
+            if (toolRound === maxToolRounds - 1) {
+                throw new Error(`Tool-call rounds exceeded limit (${maxToolRounds})`);
+            }
+
+            workingMessages.push({
+                role: 'assistant',
+                content: streamedText,
+                tool_calls: toolCalls,
+            });
+
+            const toolMessages: ChatMessage[] = [];
+            for (const call of toolCalls) {
+                if (call?.type !== 'function' || !call.function?.name) continue;
+                const toolCallId = call.id || generateToolCallId();
+                let args: Record<string, unknown> = {};
+                try {
+                    args = call.function.arguments ? JSON.parse(call.function.arguments) : {};
+                } catch (parseError) {
+                    throw new Error(`Invalid tool arguments for ${call.function.name}: ${(parseError as Error).message}`);
+                }
+
+                const executable = toolIndex.get(call.function.name);
+                if (!executable) {
+                    const errorText = `Tool not found: ${call.function.name}`;
+                    workingMessages.push({
+                        role: 'tool',
+                        tool_call_id: toolCallId,
+                        content: JSON.stringify({ error: errorText }),
+                    });
+                    toolMessages.push(createToolMessage({
+                        toolCallId,
+                        toolName: call.function.name,
+                        displayName: call.function.name,
+                        args,
+                        status: 'error',
+                        error: errorText,
+                    }));
+                    continue;
+                }
+
+                try {
+                    if (executable.sourceType === 'remote' && params.confirmRemoteTool) {
+                        const allowed = await params.confirmRemoteTool(executable, args);
+                        if (!allowed) {
+                            const errorText = 'User canceled';
+                            workingMessages.push({
+                                role: 'tool',
+                                tool_call_id: toolCallId,
+                                content: JSON.stringify({ error: errorText }),
+                            });
+                            toolMessages.push(createToolMessage({
+                                toolCallId,
+                                toolName: call.function.name,
+                                displayName: executable.displayName,
+                                args,
+                                status: 'error',
+                                error: errorText,
+                            }));
+                            continue;
+                        }
+                    }
+
+                    const result = await executable.execute(args);
+                    const toolResultText = params.formatToolResult(result, executable.outputSchema);
+                    workingMessages.push({
+                        role: 'tool',
+                        tool_call_id: toolCallId,
+                        content: toolResultText,
+                    });
+                    toolMessages.push(createToolMessage({
+                        toolCallId,
+                        toolName: call.function.name,
+                        displayName: executable.displayName,
+                        args,
+                        status: 'success',
+                        result,
+                    }));
+                } catch (toolError) {
+                    const errorText = (toolError as Error)?.message || String(toolError);
+                    workingMessages.push({
+                        role: 'tool',
+                        tool_call_id: toolCallId,
+                        content: JSON.stringify({ error: errorText }),
+                    });
+                    toolMessages.push(createToolMessage({
+                        toolCallId,
+                        toolName: call.function.name,
+                        displayName: executable.displayName,
+                        args,
+                        status: 'error',
+                        error: errorText,
+                    }));
+                }
+            }
+
+            if (toolMessages.length > 0) {
+                messages = [...messages, ...toolMessages];
+                params.updateConversation(messages);
             }
         }
 
-        const assistantMessage: ChatMessage = {
-            id: generateMessageId(),
-            role: 'assistant',
-            content: '',
-            timestamp: Date.now(),
-        };
-        messages = [...messages, assistantMessage];
-        params.updateConversation(messages);
-
-        let streamedText = '';
-        // Pass tools definitions to the streaming call so LLMs that require
-        // tools context when tool-result messages are present don't error out.
-        await params.streamCompletion(workingMessages, (delta) => {
-            streamedText += delta;
-            messages = messages.map((message) => (
-                message.id === assistantMessage.id
-                    ? { ...message, content: streamedText }
-                    : message
-            ));
-            params.updateConversation(messages);
-        }, openAiTools.length > 0 ? openAiTools : undefined, params.signal);
-
-        if (!streamedText.trim() && responseMessage?.content) {
-            messages = messages.map((message) => (
-                message.id === assistantMessage.id
-                    ? { ...message, content: responseMessage.content || '' }
-                    : message
-            ));
-        }
-
-        await params.persistConversation(messages);
-        return messages;
+        throw new Error(`Tool-call rounds exceeded limit (${maxToolRounds})`);
     } catch (error) {
         if ((error as Error).name === 'AbortError') {
             return messages; // User cancelled, just return current messages without appending error

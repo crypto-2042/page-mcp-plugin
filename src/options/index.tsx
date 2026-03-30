@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { DEFAULT_SETTINGS, PluginSettings, McpSkillsRepository } from '../shared/types.js';
 import './styles.css';
 import { addMarketOrigin, filterRemoteRepos, normalizeMarketOrigin, removeMarketOrigin, setRepoAllowWithoutConfirm } from './options-remote-services.js';
+import { MaterialSymbolIcon } from './material-symbol-icon.js';
 
 const OptionsApp: React.FC = () => {
     const [settings, setSettings] = useState<PluginSettings>(DEFAULT_SETTINGS);
@@ -291,7 +292,7 @@ const OptionsApp: React.FC = () => {
                             className={`nav-item ${tab === nav.id ? 'active' : ''}`}
                             onClick={(e) => { e.preventDefault(); setTab(nav.id); }}
                         >
-                            <span className="material-symbols-outlined">{nav.icon}</span>
+                            <MaterialSymbolIcon name={nav.icon} />
                             <span className="nav-label">{nav.label}</span>
                         </a>
                     ))}
@@ -313,7 +314,7 @@ const OptionsApp: React.FC = () => {
                         {/* Language */}
                         <div className="glass-card">
                             <div className="card-section-title">
-                                <span className="material-symbols-outlined">translate</span>
+                                <MaterialSymbolIcon name="translate" />
                                 <span>{t('languageLabel')}</span>
                             </div>
                             <div className="radio-group">
@@ -333,7 +334,7 @@ const OptionsApp: React.FC = () => {
                             <div className="card-row">
                                 <div className="card-info">
                                     <div className="card-icon-wrap">
-                                        <span className="material-symbols-outlined">radar</span>
+                                        <MaterialSymbolIcon name="radar" />
                                     </div>
                                     <div>
                                         <h3 className="card-title">{t('autoDetectTitle')}</h3>
@@ -351,7 +352,7 @@ const OptionsApp: React.FC = () => {
                             <div className="card-row">
                                 <div className="card-info">
                                     <div className="card-icon-wrap">
-                                        <span className="material-symbols-outlined">chat</span>
+                                        <MaterialSymbolIcon name="chat" />
                                     </div>
                                     <div>
                                         <h3 className="card-title">{t('alwaysInjectTitle') || "始终注入聊天"}</h3>
@@ -369,7 +370,7 @@ const OptionsApp: React.FC = () => {
                             <div className="card-row">
                                 <div className="card-info">
                                     <div className="card-icon-wrap">
-                                        <span className="material-symbols-outlined">extension</span>
+                                        <MaterialSymbolIcon name="extension" />
                                     </div>
                                     <div>
                                         <h3 className="card-title">{t('injectResourcesTitle') || "存在资源时注入"}</h3>
@@ -385,7 +386,7 @@ const OptionsApp: React.FC = () => {
 
                         <div className="glass-card">
                             <div className="card-section-title">
-                                <span className="material-symbols-outlined">swap_horiz</span>
+                                <MaterialSymbolIcon name="swap_horiz" />
                                 <span>{t('overrideTitle')}</span>
                             </div>
 
@@ -431,7 +432,7 @@ const OptionsApp: React.FC = () => {
                             <div className="site-add-row" style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
                                 <input type="text" value={newSite} onChange={e => setNewSite(e.target.value)} onKeyDown={e => e.key === 'Enter' && addSite()} placeholder={t('sitePlaceholder')} className="glass-input" style={{ flex: 1 }} />
                                 <button type="button" onClick={addSite} className="btn btn-sm btn-accent" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                    <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>add</span>
+                                    <MaterialSymbolIcon name="add" style={{ fontSize: '16px' }} />
                                     {t('addBtn')}
                                 </button>
                             </div>
@@ -450,7 +451,7 @@ const OptionsApp: React.FC = () => {
                             <div className="card-row">
                                 <div className="card-info">
                                     <div className="card-icon-wrap">
-                                        <span className="material-symbols-outlined">key</span>
+                                        <MaterialSymbolIcon name="key" />
                                     </div>
                                     <div>
                                         <h3 className="card-title">{t('apiKeyTitle')}</h3>
@@ -461,7 +462,7 @@ const OptionsApp: React.FC = () => {
                             <div className="input-password" style={{ marginTop: '16px', position: 'relative' }}>
                                 <input type={showKey ? "text" : "password"} value={settings.apiKey} onChange={e => updateSetting('apiKey', e.target.value)} placeholder="sk-..." className="glass-input" style={{ width: '100%', paddingRight: '40px' }} />
                                 <button type="button" onClick={() => setShowKey(!showKey)} className="btn-toggle-password" style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', cursor: 'pointer', color: '#888' }}>
-                                    <span className="material-symbols-outlined">{showKey ? 'visibility' : 'visibility_off'}</span>
+                                    <MaterialSymbolIcon name={showKey ? 'visibility' : 'visibility_off'} />
                                 </button>
                             </div>
                             <span className="form-hint" style={{ fontSize: '12px', color: '#888', marginTop: '8px', display: 'block' }}>{t('apiKeyHint')}</span>
@@ -471,7 +472,7 @@ const OptionsApp: React.FC = () => {
                             <div className="card-row">
                                 <div className="card-info">
                                     <div className="card-icon-wrap">
-                                        <span className="material-symbols-outlined">link</span>
+                                        <MaterialSymbolIcon name="link" />
                                     </div>
                                     <div>
                                         <h3 className="card-title">{t('baseUrlTitle')}</h3>
@@ -486,7 +487,7 @@ const OptionsApp: React.FC = () => {
                             <div className="card-row">
                                 <div className="card-info">
                                     <div className="card-icon-wrap">
-                                        <span className="material-symbols-outlined">smart_toy</span>
+                                        <MaterialSymbolIcon name="smart_toy" />
                                     </div>
                                     <div>
                                         <h3 className="card-title">{t('modelTitle')}</h3>
@@ -506,10 +507,10 @@ const OptionsApp: React.FC = () => {
                                         ))}
                                     </select>
                                     <button onClick={fetchModels} className="btn btn-sm btn-accent flex items-center justify-center p-2 rounded-lg">
-                                        <span className={`material-symbols-outlined ${modelsInfo.fetching ? 'animate-spin' : ''}`} style={{ fontSize: '18px' }}>refresh</span>
+                                        <MaterialSymbolIcon name="refresh" className={modelsInfo.fetching ? 'animate-spin' : ''} style={{ fontSize: '18px' }} />
                                     </button>
                                     <button onClick={() => setShowManualModel(!showManualModel)} className="btn btn-sm btn-outline flex items-center justify-center p-2 rounded-lg">
-                                        <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>add</span>
+                                        <MaterialSymbolIcon name="add" style={{ fontSize: '18px' }} />
                                     </button>
                                 </div>
                                 {showManualModel && (
@@ -527,7 +528,7 @@ const OptionsApp: React.FC = () => {
                             <div className="card-row" style={{ alignItems: 'center' }}>
                                 <div className="card-info">
                                     <div className="card-icon-wrap">
-                                        <span className="material-symbols-outlined">speed</span>
+                                        <MaterialSymbolIcon name="speed" />
                                     </div>
                                     <div>
                                         <h3 className="card-title">{t('testTitle') || "连接测试"}</h3>
@@ -535,7 +536,7 @@ const OptionsApp: React.FC = () => {
                                     </div>
                                 </div>
                                 <button type="button" onClick={testConnection} disabled={testResult?.isTesting} className="btn btn-accent" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>bolt</span>
+                                    <MaterialSymbolIcon name="bolt" style={{ fontSize: '16px' }} />
                                     <span>{t('testBtn')}</span>
                                 </button>
                             </div>
@@ -559,7 +560,7 @@ const OptionsApp: React.FC = () => {
                             <div className="interface-settings">
                                 <div className="glass-card">
                                     <div className="card-section-title">
-                                        <span className="material-symbols-outlined">dark_mode</span>
+                                        <MaterialSymbolIcon name="dark_mode" />
                                         <span>{t('themeTitle')}</span>
                                     </div>
                                     <div className="radio-group">
@@ -571,7 +572,7 @@ const OptionsApp: React.FC = () => {
                                             <label key={th.id} className="radio-card">
                                                 <input type="radio" name="theme" checked={settings.theme === th.id} onChange={() => updateSetting('theme', th.id as any)} />
                                                 <span className="radio-card-label">
-                                                    <span className="material-symbols-outlined">{th.icon}</span>
+                                                    <MaterialSymbolIcon name={th.icon} />
                                                     <span>{th.label}</span>
                                                 </span>
                                             </label>
@@ -581,7 +582,7 @@ const OptionsApp: React.FC = () => {
 
                                 <div className="glass-card">
                                     <div className="card-section-title">
-                                        <span className="material-symbols-outlined">colorize</span>
+                                        <MaterialSymbolIcon name="colorize" />
                                         <span>{t('accentTitle')}</span>
                                     </div>
                                     <div className="color-picker-row">
@@ -596,7 +597,7 @@ const OptionsApp: React.FC = () => {
 
                                 <div className="glass-card">
                                     <div className="card-section-title">
-                                        <span className="material-symbols-outlined">pip</span>
+                                        <MaterialSymbolIcon name="pip" />
                                         <span>{t('positionTitle') || "悬浮球位置"}</span>
                                     </div>
                                     <div className="radio-group radio-group-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
@@ -622,13 +623,13 @@ const OptionsApp: React.FC = () => {
 
                             <div className="interface-preview">
                                 <div className="preview-header">
-                                    <span className="material-symbols-outlined">visibility</span>
+                                    <MaterialSymbolIcon name="visibility" />
                                     <span>{t('previewTitle') || "实时预览"}</span>
                                 </div>
                                 <div className="mock-chat-panel">
                                     <div className="mock-panel-header">
                                         <div className="mock-header-left">
-                                            <span className="material-symbols-outlined">chat</span>
+                                            <MaterialSymbolIcon name="chat" />
                                             <span>AI Assistant</span>
                                         </div>
                                     </div>
@@ -641,8 +642,8 @@ const OptionsApp: React.FC = () => {
                                         </div>
                                         <div className="mock-message mock-msg-assistant">
                                             <div className="mock-msg-bubble mock-msg-actions">
-                                                <div className="mock-action-chip"><span className="material-symbols-outlined">summarize</span> summarize</div>
-                                                <div className="mock-action-chip"><span className="material-symbols-outlined">translate</span> translate</div>
+                                                <div className="mock-action-chip"><MaterialSymbolIcon name="summarize" /> summarize</div>
+                                                <div className="mock-action-chip"><MaterialSymbolIcon name="translate" /> translate</div>
                                             </div>
                                         </div>
                                     </div>
@@ -665,7 +666,7 @@ const OptionsApp: React.FC = () => {
                     <div className="panel-body">
                         <div className="glass-card">
                             <div className="card-section-title">
-                                <span className="material-symbols-outlined">database</span>
+                                <MaterialSymbolIcon name="database" />
                                 <span>{t('dataStorageTitle')}</span>
                             </div>
 
@@ -701,7 +702,7 @@ const OptionsApp: React.FC = () => {
 
                     <div className="glass-card">
                         <div className="card-section-title">
-                            <span className="material-symbols-outlined">verified_user</span>
+                            <MaterialSymbolIcon name="verified_user" />
                             <span>{t('permissionTitle') || "权限控制"}</span>
                         </div>
 
@@ -739,7 +740,7 @@ const OptionsApp: React.FC = () => {
                             <div className="card-row" style={{ alignItems: 'center' }}>
                                 <div className="card-info">
                                     <div className="card-icon-wrap danger">
-                                        <span className="material-symbols-outlined">delete_forever</span>
+                                        <MaterialSymbolIcon name="delete_forever" />
                                     </div>
                                     <div>
                                         <h3 className="card-title">{t('clearAllTitle')}</h3>
@@ -755,7 +756,7 @@ const OptionsApp: React.FC = () => {
                                         });
                                     }
                                 }} className="btn btn-danger" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>delete</span>
+                                    <MaterialSymbolIcon name="delete" style={{ fontSize: '16px' }} />
                                     <span>{t('clearAllBtn')}</span>
                                 </button>
                             </div>
@@ -774,7 +775,7 @@ const OptionsApp: React.FC = () => {
                             <div className="card-row">
                                 <div className="card-info">
                                     <div className="card-icon-wrap">
-                                        <span className="material-symbols-outlined">cloud_download</span>
+                                        <MaterialSymbolIcon name="cloud_download" />
                                     </div>
                                     <div>
                                         <h3 className="card-title">{t('remoteLoadingSwitchTitle') || '启用远程加载'}</h3>
@@ -794,7 +795,7 @@ const OptionsApp: React.FC = () => {
 
                         <div className="glass-card">
                             <div className="card-section-title">
-                                <span className="material-symbols-outlined">shield_lock</span>
+                                <MaterialSymbolIcon name="shield_lock" />
                                 <span>{t('marketWhitelistTitle') || '市场源白名单'}</span>
                             </div>
                             <p className="card-desc" style={{ marginTop: '10px', marginBottom: '12px' }}>
@@ -828,7 +829,7 @@ const OptionsApp: React.FC = () => {
                                     style={{ flex: 1 }}
                                 />
                                 <button type="button" onClick={addMarketOriginSetting} className="btn btn-sm btn-accent" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                    <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>add</span>
+                                    <MaterialSymbolIcon name="add" style={{ fontSize: '16px' }} />
                                     {t('addBtn')}
                                 </button>
                             </div>
@@ -838,7 +839,7 @@ const OptionsApp: React.FC = () => {
                             <div className="card-row">
                                 <div className="card-info">
                                     <div className="card-icon-wrap">
-                                        <span className="material-symbols-outlined">search</span>
+                                        <MaterialSymbolIcon name="search" />
                                     </div>
                                     <div>
                                         <h3 className="card-title">{t('remoteSearchTitle') || '搜索 MCP/Skills 仓库'}</h3>
@@ -880,7 +881,7 @@ const OptionsApp: React.FC = () => {
                                         <div className="card-row" style={{ alignItems: 'flex-start' }}>
                                             <div className="card-info">
                                                 <div className="card-icon-wrap">
-                                                    <span className="material-symbols-outlined">deployed_code</span>
+                                                    <MaterialSymbolIcon name="deployed_code" />
                                                 </div>
                                                 <div style={{ minWidth: 0 }}>
                                                     <h3 className="card-title" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -942,7 +943,7 @@ const OptionsApp: React.FC = () => {
                         {/* About */}
                         <div className="glass-card">
                             <div className="card-section-title">
-                                <span className="material-symbols-outlined">info</span>
+                                <MaterialSymbolIcon name="info" />
                                 <span>{t('aboutTitle') || "关于 Page MCP"}</span>
                             </div>
                             <div className="about-grid">
@@ -970,7 +971,7 @@ const OptionsApp: React.FC = () => {
                             <div className="card-row" style={{ alignItems: 'center' }}>
                                 <div className="card-info">
                                     <div className="card-icon-wrap warning">
-                                        <span className="material-symbols-outlined">restart_alt</span>
+                                        <MaterialSymbolIcon name="restart_alt" />
                                     </div>
                                     <div>
                                         <h3 className="card-title">{t('resetTitle') || "恢复默认设置"}</h3>
