@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { ChatMessage } from '../shared/types.js';
 import { createSelectionQuoteDraft } from './selection-quote-ui.js';
-import { buildSelectionQuotePreparedMessages } from './selection-quote-send.js';
+import {
+    buildSelectionQuotePreparedMessages,
+    shouldClearSelectionQuoteDraft,
+} from './selection-quote-send.js';
 
 const resourceMessage: ChatMessage = {
     id: 'msg_resource',
@@ -87,5 +90,19 @@ describe('selection quote send preparation', () => {
         expect(prepared.messages[1]?.content).toContain('Pinned quote text');
         expect(prepared.messages[2]).toEqual(resourceMessage);
         expect(prepared.messages[3]).toEqual(userMessage);
+    });
+
+    it('keeps the draft quote when the prepared turn does not complete', () => {
+        expect(shouldClearSelectionQuoteDraft({
+            shouldClearDraftQuoteAfterCommit: true,
+            turnCompleted: false,
+        })).toBe(false);
+    });
+
+    it('clears the draft quote only after a successful prepared turn completes', () => {
+        expect(shouldClearSelectionQuoteDraft({
+            shouldClearDraftQuoteAfterCommit: true,
+            turnCompleted: true,
+        })).toBe(true);
     });
 });

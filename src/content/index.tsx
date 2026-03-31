@@ -40,7 +40,10 @@ import {
     pinSelectionQuoteConversation,
 } from './selection-quote-ui.js';
 import { registerSelectionQuoteRuntimeListener } from './selection-quote-runtime.js';
-import { buildSelectionQuotePreparedMessages } from './selection-quote-send.js';
+import {
+    buildSelectionQuotePreparedMessages,
+    shouldClearSelectionQuoteDraft,
+} from './selection-quote-send.js';
 
 // Hooks
 import { usePluginSettings } from './hooks/use-settings.js';
@@ -333,6 +336,7 @@ const ChatWidget = () => {
             pinnedQuote: activeConv?.pinnedQuote ?? null,
         };
         let shouldClearDraftQuoteAfterCommit = false;
+        let turnCompleted = false;
 
         await runChatAction({
             activeConversation: activeConv,
@@ -349,10 +353,6 @@ const ChatWidget = () => {
             },
             upsertConversation: (conversation) => {
                 upsertConversation(conversation);
-                if (shouldClearDraftQuoteAfterCommit) {
-                    shouldClearDraftQuoteAfterCommit = false;
-                    setDraftQuote(null);
-                }
             },
             setActiveConversationId: setActiveConvId,
             setLoading: setIsLoading,
@@ -366,10 +366,18 @@ const ChatWidget = () => {
                     persistConversation: persistConv,
                     signal: abortControllerRef.current?.signal,
                 });
+                turnCompleted = true;
                 return { ...conversation, messages };
             },
             persistConversation: persistConv,
         });
+
+        if (shouldClearSelectionQuoteDraft({
+            shouldClearDraftQuoteAfterCommit,
+            turnCompleted,
+        })) {
+            setDraftQuote(null);
+        }
     };
 
     const handleSend = async (text: string = inputText) => {

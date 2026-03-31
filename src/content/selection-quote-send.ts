@@ -19,3 +19,10 @@ export function buildSelectionQuotePreparedMessages(params: {
         shouldClearDraftQuoteAfterCommit: !!params.draftQuote && params.draftQuote.text.trim().length > 0,
     };
 }
+
+export function shouldClearSelectionQuoteDraft(params: {
+    shouldClearDraftQuoteAfterCommit: boolean;
+    turnCompleted: boolean;
+}): boolean {
+    return params.shouldClearDraftQuoteAfterCommit && params.turnCompleted;
+}
