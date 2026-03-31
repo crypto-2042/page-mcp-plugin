@@ -95,7 +95,6 @@ describe('selection quote runtime listener', () => {
 
         const markup = renderSelectionQuoteArea(state.draftQuote, state.panelOpen);
         expect(markup).toContain('pmcp-selection-quote-strip open');
-        expect(markup).toContain('Selection quote');
         expect(markup).toContain('Selected text from the page');
 
         cleanup();
@@ -176,8 +175,8 @@ describe('selection quote runtime listener', () => {
         });
 
         const markup = renderPinnedSelectionQuote(draftQuote, true);
-        expect(markup).toContain('Pinned quote');
         expect(markup).toContain('Pinned quote text');
+        expect(markup).toContain('pmcp-selection-quote-pin is-active');
     });
 
     it('removes a pinned quote from a conversation', () => {
@@ -262,7 +261,6 @@ describe('selection quote runtime listener', () => {
         })).toBeNull();
 
         const markup = renderPinnedSelectionQuote(display?.quote ?? null, true);
-        expect(markup).toContain('Pinned quote');
         expect(markup).toContain('Conversation-level pinned quote');
     });
 
@@ -287,7 +285,6 @@ describe('selection quote runtime listener', () => {
             }),
         );
 
-        expect(markup).toContain('Localized draft label');
         expect(markup).toContain('Localized pin button');
         expect(markup).toContain('Localized remove button');
         expect(markup).not.toContain('title="Localized quote text"');

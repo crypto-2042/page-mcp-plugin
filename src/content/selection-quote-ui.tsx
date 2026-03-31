@@ -110,14 +110,13 @@ export function SelectionQuoteChip(props: {
                 <Quote size={13} strokeWidth={2.1} />
             </div>
             <div className="pmcp-selection-quote-content">
-                <div className="pmcp-selection-quote-label">{isPinned ? labels.pinnedLabel : labels.draftLabel}</div>
                 <div className="pmcp-selection-quote-text">
                     {previewText}
                 </div>
             </div>
             <div className="pmcp-selection-quote-actions">
                 <button
-                    className="pmcp-selection-quote-btn pmcp-selection-quote-pin"
+                    className={`pmcp-selection-quote-btn pmcp-selection-quote-pin ${isPinned ? 'is-active' : ''}`}
                     type="button"
                     onClick={props.onPin}
                     disabled={!props.onPin}

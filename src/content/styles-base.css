@@ -807,14 +807,7 @@ h4.pmcp-heading, .pmcp-bubble h4 { font-size: 14px; }
     min-width: 0;
     flex: 1;
     display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-.pmcp-selection-quote-label {
-    font-size: 11px;
-    color: var(--pmcp-text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+    align-items: center;
 }
 .pmcp-selection-quote-text {
     font-size: 13px;
@@ -847,6 +840,21 @@ h4.pmcp-heading, .pmcp-bubble h4 { font-size: 14px; }
     background: var(--pmcp-bg-glass-hover);
     border-color: var(--pmcp-border);
     color: var(--pmcp-text);
+}
+.pmcp-selection-quote-btn.is-active {
+    background: var(--pmcp-accent);
+    border-color: var(--pmcp-accent);
+    color: #fff;
+    box-shadow: 0 6px 18px color-mix(in srgb, var(--pmcp-accent) 32%, transparent);
+}
+.pmcp-selection-quote-btn.is-active:hover {
+    background: var(--pmcp-accent);
+    border-color: var(--pmcp-accent);
+    color: #fff;
+    transform: translateY(-1px);
+}
+.pmcp-selection-quote-btn.is-active svg {
+    transform: rotate(18deg);
 }
 .pmcp-selection-quote-btn:disabled {
     opacity: 0.4;

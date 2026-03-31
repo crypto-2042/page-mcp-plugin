@@ -264,9 +264,9 @@ const ChatWidget = () => {
         if (!draftQuote && activeConv?.pinnedQuote) {
             const pinnedQuote = activeConv.pinnedQuote;
             const nextConversation = clearSelectionQuoteConversation(activeConv);
-            await persistConv(nextConversation);
             upsertConversation(nextConversation);
             setDraftQuote(pinnedQuote);
+            await persistConv(nextConversation);
             return;
         }
 
@@ -282,8 +282,9 @@ const ChatWidget = () => {
             quote: draftQuote,
         });
 
-        await persistConv(nextConversation);
+        upsertConversation(nextConversation);
         setDraftQuote(null);
+        await persistConv(nextConversation);
     };
 
     const handleCloseSelectionQuote = async () => {
@@ -295,8 +296,8 @@ const ChatWidget = () => {
         if (!activeConv?.pinnedQuote) return;
 
         const nextConversation = clearSelectionQuoteConversation(activeConv);
-        await persistConv(nextConversation);
         upsertConversation(nextConversation);
+        await persistConv(nextConversation);
     };
 
     const selectionQuoteDisplay = getSelectionQuoteDisplayState({
