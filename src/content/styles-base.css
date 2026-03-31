@@ -768,6 +768,99 @@ h4.pmcp-heading, .pmcp-bubble h4 { font-size: 14px; }
     white-space: nowrap;
 }
 
+/* ---- Selection Quote ---- */
+.pmcp-selection-quote-strip {
+    padding: 12px 16px 0;
+    background: var(--pmcp-bg-secondary);
+}
+.pmcp-selection-quote-chip {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: var(--pmcp-radius-md);
+    border: 1px solid var(--pmcp-border);
+    background: var(--pmcp-bg-glass);
+    backdrop-filter: blur(var(--pmcp-blur-heavy));
+    -webkit-backdrop-filter: blur(var(--pmcp-blur-heavy));
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+.pmcp-selection-quote-marker {
+    width: 26px;
+    height: 26px;
+    flex-shrink: 0;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--pmcp-bg-glass-hover);
+    border: 1px solid var(--pmcp-border-light);
+    color: var(--pmcp-text-secondary);
+}
+.pmcp-selection-quote-marker-icon {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+.pmcp-selection-quote-content {
+    min-width: 0;
+    flex: 1;
+    display: flex;
+    align-items: center;
+}
+.pmcp-selection-quote-text {
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--pmcp-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.pmcp-selection-quote-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+.pmcp-selection-quote-btn {
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    border: 1px solid var(--pmcp-border-light);
+    background: var(--pmcp-bg-glass);
+    color: var(--pmcp-text-secondary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all var(--pmcp-transition-fast);
+}
+.pmcp-selection-quote-btn:hover {
+    background: var(--pmcp-bg-glass-hover);
+    border-color: var(--pmcp-border);
+    color: var(--pmcp-text);
+}
+.pmcp-selection-quote-btn.is-active {
+    background: var(--pmcp-accent);
+    border-color: var(--pmcp-accent);
+    color: #fff;
+    box-shadow: 0 6px 18px color-mix(in srgb, var(--pmcp-accent) 32%, transparent);
+}
+.pmcp-selection-quote-btn.is-active:hover {
+    background: var(--pmcp-accent);
+    border-color: var(--pmcp-accent);
+    color: #fff;
+    transform: translateY(-1px);
+}
+.pmcp-selection-quote-btn.is-active svg {
+    transform: rotate(18deg);
+}
+.pmcp-selection-quote-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
 /* ---- Input ---- */
 .pmcp-input-area {
     display: flex; align-items: center; gap: 10px;

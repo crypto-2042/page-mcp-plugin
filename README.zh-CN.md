@@ -89,6 +89,7 @@ Chat 组件支持：
 - 自动 MCP 工具调用（带确认机制）
 - Markdown 渲染与语法高亮
 - 按域名隔离的对话历史
+- 通过右键菜单把选中的页面文本作为上下文附加到聊天中，支持一次性草稿和按会话固定
 - 明亮 / 暗黑 / 跟随系统 主题切换
 
 ### 🏪 远程 MCP/Skills 市场
@@ -115,7 +116,7 @@ Chat 组件支持：
 ### 前置条件
 
 - **Node.js** ≥ 18
-- **pnpm**（推荐）或 npm
+- **pnpm**（唯一支持的包管理器）
 - **Chrome** 或基于 Chromium 的浏览器（Manifest V3）
 
 ### 从源码构建
@@ -147,6 +148,12 @@ pnpm dev
 ```
 
 运行 `pnpm dev` 后，在 `chrome://extensions/` 中重新加载扩展即可生效。
+
+### 开发规则
+
+- 仅使用 `pnpm`。本仓库不支持 `npm` 或 `bun` 工作流。
+- 所有新增的用户可见文案都必须同时补齐 `en` 和 `zh` 国际化。
+- 使用现有图标体系：content/popup 使用 `lucide-react`，options 保持 `MaterialSymbolIcon`，不要再用文本占位来冒充图标。
 
 ---
 

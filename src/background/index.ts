@@ -14,10 +14,61 @@ import { extractStreamEventsFromBuffer } from './stream-events.js';
 
 const PROXY_TIMEOUT_MS = 30000;
 const AI_STREAM_PORT = 'PMCP_AI_STREAM';
+const SELECTION_QUOTE_CONTEXT_MENU_ID = 'pmcp-add-selection-quote';
 
 function normalizeApiKey(raw: string): string {
     const trimmed = (raw || '').trim();
     return trimmed.replace(/^Bearer\s+/i, '');
+}
+
+function getSelectionQuoteContextMenuTitle(): string {
+    return chrome.i18n.getMessage('selectionQuoteContextMenuTitle') || 'As Chat Resource';
+}
+
+function isBlankSelectionText(selectionText?: string): boolean {
+    return !selectionText || selectionText.trim().length === 0;
+}
+
+async function registerSelectionQuoteContextMenu() {
+    await chrome.contextMenus.removeAll();
+    chrome.contextMenus.create({
+        id: SELECTION_QUOTE_CONTEXT_MENU_ID,
+        title: getSelectionQuoteContextMenuTitle(),
+        contexts: ['selection'],
+    });
+}
+
+async function forwardSelectionQuoteToActiveTab(selectionText: string) {
+    try {
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        const tabId = tabs.find((tab) => typeof tab.id === 'number')?.id;
+        if (typeof tabId !== 'number') return;
+
+        await chrome.tabs.sendMessage(tabId, {
+            type: 'ADD_SELECTION_QUOTE',
+            text: selectionText,
+        }).catch(() => {
+            // Selection quotes are best-effort in v1.
+        });
+    } catch {
+        // Selection quotes are best-effort in v1.
+    }
+}
+
+function registerSelectionQuoteLifecycle() {
+    chrome.contextMenus.onClicked.addListener(async (info) => {
+        const selectionText = info.selectionText;
+        if (isBlankSelectionText(selectionText)) return;
+        await forwardSelectionQuoteToActiveTab(selectionText as string);
+    });
+
+    chrome.runtime.onInstalled.addListener(() => {
+        void registerSelectionQuoteContextMenu();
+    });
+
+    chrome.runtime.onStartup.addListener(() => {
+        void registerSelectionQuoteContextMenu();
+    });
 }
 
 // ---- Message Handler ----
@@ -127,6 +178,8 @@ chrome.runtime.onConnect.addListener((port) => {
         }
     });
 });
+
+registerSelectionQuoteLifecycle();
 
 async function handleMessage(msg: PluginMessage, sender: chrome.runtime.MessageSender): Promise<unknown> {
     switch (msg.type) {

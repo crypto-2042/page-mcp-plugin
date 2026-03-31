@@ -17,6 +17,27 @@
     "resources": {
         "message": "资源 (Resources)"
     },
+    "selectionQuoteContextMenuTitle": {
+        "message": "作为 Chat 资源"
+    },
+    "selectionQuoteDraftLabel": {
+        "message": "选中文本引用"
+    },
+    "selectionQuotePinnedLabel": {
+        "message": "固定引用"
+    },
+    "selectionQuotePinButtonLabel": {
+        "message": "固定引用"
+    },
+    "selectionQuotePinnedButtonLabel": {
+        "message": "已固定引用"
+    },
+    "selectionQuoteUnpinButtonLabel": {
+        "message": "取消固定"
+    },
+    "selectionQuoteRemoveButtonLabel": {
+        "message": "移除引用"
+    },
     "skills": {
         "message": "技能 (Skills)"
     },

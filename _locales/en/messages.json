@@ -17,6 +17,27 @@
     "resources": {
         "message": "Resources"
     },
+    "selectionQuoteContextMenuTitle": {
+        "message": "As Chat Resource"
+    },
+    "selectionQuoteDraftLabel": {
+        "message": "Selection quote"
+    },
+    "selectionQuotePinnedLabel": {
+        "message": "Pinned quote"
+    },
+    "selectionQuotePinButtonLabel": {
+        "message": "Pin quote"
+    },
+    "selectionQuotePinnedButtonLabel": {
+        "message": "Pinned quote"
+    },
+    "selectionQuoteUnpinButtonLabel": {
+        "message": "Unpin quote"
+    },
+    "selectionQuoteRemoveButtonLabel": {
+        "message": "Remove quote"
+    },
     "skills": {
         "message": "Skills"
     },
