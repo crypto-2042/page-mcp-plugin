@@ -4,6 +4,14 @@ import type { Conversation, ConversationQuote } from '../shared/types.js';
 
 export const MAX_SELECTION_QUOTE_PREVIEW_CHARS = 180;
 
+const DEFAULT_SELECTION_QUOTE_LABELS = {
+    draftLabel: 'Selection quote',
+    pinnedLabel: 'Pinned quote',
+    pinButtonLabel: 'Pin quote',
+    pinnedButtonLabel: 'Pinned quote',
+    removeButtonLabel: 'Remove quote',
+};
+
 export type SelectionQuoteUiState = {
     draftQuote: ConversationQuote | null;
     panelOpen: boolean;
@@ -12,6 +20,14 @@ export type SelectionQuoteUiState = {
 export type SelectionQuoteDisplayState = {
     quote: ConversationQuote;
     pinned: boolean;
+};
+
+export type SelectionQuoteLabels = {
+    draftLabel: string;
+    pinnedLabel: string;
+    pinButtonLabel: string;
+    pinnedButtonLabel: string;
+    removeButtonLabel: string;
 };
 
 export function normalizeSelectionQuoteText(text: string): string {
@@ -80,9 +96,11 @@ export function SelectionQuoteChip(props: {
     onClose: () => void;
     onPin?: () => void;
     pinned?: boolean;
+    labels?: SelectionQuoteLabels;
 }) {
     const previewText = truncateSelectionQuotePreviewText(props.quote.text);
     const isPinned = !!props.pinned;
+    const labels = props.labels ?? DEFAULT_SELECTION_QUOTE_LABELS;
 
     return (
         <div className={`pmcp-selection-quote-chip ${isPinned ? 'pinned' : 'draft'}`}>
@@ -90,7 +108,7 @@ export function SelectionQuoteChip(props: {
                 <span className="pmcp-selection-quote-marker-icon">quote</span>
             </div>
             <div className="pmcp-selection-quote-content">
-                <div className="pmcp-selection-quote-label">{isPinned ? 'Pinned quote' : 'Selection quote'}</div>
+                <div className="pmcp-selection-quote-label">{isPinned ? labels.pinnedLabel : labels.draftLabel}</div>
                 <div className="pmcp-selection-quote-text" title={props.quote.text}>
                     {previewText}
                 </div>
@@ -101,8 +119,8 @@ export function SelectionQuoteChip(props: {
                     type="button"
                     onClick={props.onPin}
                     disabled={!props.onPin}
-                    aria-label={isPinned ? 'Pinned quote' : 'Pin quote'}
-                    title={isPinned ? 'Pinned quote' : 'Pin quote'}
+                    aria-label={isPinned ? labels.pinnedButtonLabel : labels.pinButtonLabel}
+                    title={isPinned ? labels.pinnedButtonLabel : labels.pinButtonLabel}
                 >
                     <Pin size={14} />
                 </button>
@@ -110,8 +128,8 @@ export function SelectionQuoteChip(props: {
                     className="pmcp-selection-quote-btn pmcp-selection-quote-close"
                     type="button"
                     onClick={props.onClose}
-                    aria-label="Remove quote"
-                    title="Remove quote"
+                    aria-label={labels.removeButtonLabel}
+                    title={labels.removeButtonLabel}
                 >
                     <X size={14} />
                 </button>
@@ -126,6 +144,7 @@ export function SelectionQuoteArea(props: {
     pinned?: boolean;
     onClose: () => void;
     onPin?: () => void;
+    labels?: SelectionQuoteLabels;
 }) {
     if (!props.quote) return null;
 
@@ -136,6 +155,7 @@ export function SelectionQuoteArea(props: {
                 pinned={props.pinned}
                 onClose={props.onClose}
                 onPin={props.onPin}
+                labels={props.labels}
             />
         </div>
     );

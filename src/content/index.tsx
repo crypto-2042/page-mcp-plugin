@@ -291,6 +291,13 @@ const ChatWidget = () => {
         draftQuote,
         activeConversation: activeConv,
     });
+    const selectionQuoteLabels = {
+        draftLabel: t('selectionQuoteDraftLabel') || 'Selection quote',
+        pinnedLabel: t('selectionQuotePinnedLabel') || 'Pinned quote',
+        pinButtonLabel: t('selectionQuotePinButtonLabel') || 'Pin quote',
+        pinnedButtonLabel: t('selectionQuotePinnedButtonLabel') || 'Pinned quote',
+        removeButtonLabel: t('selectionQuoteRemoveButtonLabel') || 'Remove quote',
+    };
 
 
 
@@ -659,6 +666,7 @@ const ChatWidget = () => {
                             pinned={selectionQuoteDisplay?.pinned}
                             onClose={handleCloseSelectionQuote}
                             onPin={draftQuote ? handlePinSelectionQuote : undefined}
+                            labels={selectionQuoteLabels}
                         />
 
                         <div className="pmcp-input-area">

@@ -9,6 +9,7 @@ const runtimeOnConnectAddListener = vi.fn();
 const runtimeOnInstalledAddListener = vi.fn();
 const runtimeOnStartupAddListener = vi.fn();
 const runtimeOpenOptionsPage = vi.fn();
+const i18nGetMessage = vi.fn((key: string) => (key === 'selectionQuoteContextMenuTitle' ? 'Localized As Chat Resource' : ''));
 const tabsSendMessage = vi.fn(async () => ({}));
 const tabsQuery = vi.fn(async () => [{ id: 123 }]);
 const actionOnClickedAddListener = vi.fn();
@@ -19,6 +20,9 @@ let startupHandler: (() => void | Promise<void>) | null = null;
 
 function installChromeMock() {
     vi.stubGlobal('chrome', {
+        i18n: {
+            getMessage: i18nGetMessage,
+        },
         contextMenus: {
             create: contextMenusCreate,
             removeAll: contextMenusRemoveAll,
@@ -103,6 +107,17 @@ describe('background selection quote context menu', () => {
         expect(contextMenusCreate).toHaveBeenNthCalledWith(1, expect.objectContaining({
             id: 'pmcp-add-selection-quote',
             contexts: ['selection'],
+        }));
+    });
+
+    it('localizes the selection quote context menu title', async () => {
+        await loadBackgroundModule();
+
+        await startupHandler?.();
+
+        expect(i18nGetMessage).toHaveBeenCalledWith('selectionQuoteContextMenuTitle');
+        expect(contextMenusCreate).toHaveBeenCalledWith(expect.objectContaining({
+            title: 'Localized As Chat Resource',
         }));
     });
 

@@ -21,6 +21,10 @@ function normalizeApiKey(raw: string): string {
     return trimmed.replace(/^Bearer\s+/i, '');
 }
 
+function getSelectionQuoteContextMenuTitle(): string {
+    return chrome.i18n.getMessage('selectionQuoteContextMenuTitle') || 'As Chat Resource';
+}
+
 function isBlankSelectionText(selectionText?: string): boolean {
     return !selectionText || selectionText.trim().length === 0;
 }
@@ -29,7 +33,7 @@ async function registerSelectionQuoteContextMenu() {
     await chrome.contextMenus.removeAll();
     chrome.contextMenus.create({
         id: SELECTION_QUOTE_CONTEXT_MENU_ID,
-        title: 'As Chat Resource',
+        title: getSelectionQuoteContextMenuTitle(),
         contexts: ['selection'],
     });
 }

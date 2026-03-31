@@ -240,6 +240,31 @@ describe('selection quote runtime listener', () => {
         expect(markup).toContain('Conversation-level pinned quote');
     });
 
+    it('renders localized quote labels when provided', () => {
+        const quote = createSelectionQuoteDraft('Localized quote text', 789);
+        expect(quote).not.toBeNull();
+
+        const markup = renderToStaticMarkup(
+            React.createElement(SelectionQuoteArea, {
+                open: true,
+                quote,
+                pinned: false,
+                onClose: () => {},
+                labels: {
+                    draftLabel: 'Localized draft label',
+                    pinnedLabel: 'Localized pinned label',
+                    pinButtonLabel: 'Localized pin button',
+                    pinnedButtonLabel: 'Localized pinned button',
+                    removeButtonLabel: 'Localized remove button',
+                },
+            }),
+        );
+
+        expect(markup).toContain('Localized draft label');
+        expect(markup).toContain('Localized pin button');
+        expect(markup).toContain('Localized remove button');
+    });
+
     it('ignores blank selection text', () => {
         expect(createSelectionQuoteDraft('   ')).toBeNull();
     });
