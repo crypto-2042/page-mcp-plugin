@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 import type { ChatMessage } from '../shared/types.js';
 import { createSelectionQuoteDraft } from './selection-quote-ui.js';
 import {
-    buildSelectionQuotePreparedMessages,
+    buildSelectionQuoteTurnMessages,
     shouldClearSelectionQuoteDraft,
+    stripSelectionQuoteMessages,
 } from './selection-quote-send.js';
 
 const resourceMessage: ChatMessage = {
@@ -22,74 +23,69 @@ const userMessage: ChatMessage = {
 };
 
 describe('selection quote send preparation', () => {
-    it('injects a draft quote for the next send only', () => {
+    it('builds a draft quote as transient turn context', () => {
         const draftQuote = createSelectionQuoteDraft('Draft quote text', 123);
         expect(draftQuote).not.toBeNull();
 
-        const firstTurn = buildSelectionQuotePreparedMessages({
+        const firstTurn = buildSelectionQuoteTurnMessages({
             draftQuote,
             pinnedQuote: null,
-            baseMessages: [resourceMessage, userMessage],
         });
 
-        expect(firstTurn.shouldClearDraftQuoteAfterCommit).toBe(true);
-        expect(firstTurn.messages.map((message) => message.role)).toEqual(['system', 'system', 'user']);
-        expect(firstTurn.messages[0]?.content).toContain('Selected page text for this conversation turn:');
-        expect(firstTurn.messages[0]?.content).toContain('Draft quote text');
-        expect(firstTurn.messages[1]).toEqual(resourceMessage);
-        expect(firstTurn.messages[2]).toEqual(userMessage);
+        expect(firstTurn).toHaveLength(1);
+        expect(firstTurn[0]?.role).toBe('system');
+        expect(firstTurn[0]?.content).toContain('Selected page text for this conversation turn:');
+        expect(firstTurn[0]?.content).toContain('<selection_quote>');
+        expect(firstTurn[0]?.content).toContain('Draft quote text');
 
-        const secondTurn = buildSelectionQuotePreparedMessages({
+        const secondTurn = buildSelectionQuoteTurnMessages({
             draftQuote: null,
             pinnedQuote: null,
-            baseMessages: [resourceMessage, userMessage],
         });
 
-        expect(secondTurn.shouldClearDraftQuoteAfterCommit).toBe(false);
-        expect(secondTurn.messages).toEqual([resourceMessage, userMessage]);
+        expect(secondTurn).toEqual([]);
     });
 
-    it('keeps a pinned quote across sends', () => {
+    it('builds a pinned quote as transient turn context across sends', () => {
         const pinnedQuote = createSelectionQuoteDraft('Pinned quote text', 456);
         expect(pinnedQuote).not.toBeNull();
 
-        const firstTurn = buildSelectionQuotePreparedMessages({
+        const firstTurn = buildSelectionQuoteTurnMessages({
             draftQuote: null,
             pinnedQuote,
-            baseMessages: [resourceMessage, userMessage],
         });
 
-        expect(firstTurn.shouldClearDraftQuoteAfterCommit).toBe(false);
-        expect(firstTurn.messages[0]?.content).toContain('Pinned selected page text for this conversation:');
-        expect(firstTurn.messages[0]?.content).toContain('Pinned quote text');
+        expect(firstTurn).toHaveLength(1);
+        expect(firstTurn[0]?.content).toContain('Pinned selected page text for this conversation:');
+        expect(firstTurn[0]?.content).toContain('<pinned_selection_quote>');
+        expect(firstTurn[0]?.content).toContain('Pinned quote text');
 
-        const secondTurn = buildSelectionQuotePreparedMessages({
+        const secondTurn = buildSelectionQuoteTurnMessages({
             draftQuote: null,
             pinnedQuote,
-            baseMessages: [resourceMessage, userMessage],
         });
 
-        expect(secondTurn.shouldClearDraftQuoteAfterCommit).toBe(false);
-        expect(secondTurn.messages[0]?.content).toContain('Pinned quote text');
-        expect(secondTurn.messages[1]).toEqual(resourceMessage);
-        expect(secondTurn.messages[2]).toEqual(userMessage);
+        expect(secondTurn).toHaveLength(1);
+        expect(secondTurn[0]?.content).toContain('Pinned quote text');
     });
 
-    it('keeps quote ordering stable ahead of resource and user messages', () => {
+    it('keeps quote ordering stable ahead of resource and user messages without persisting them', () => {
         const draftQuote = createSelectionQuoteDraft('Draft quote text', 123);
         const pinnedQuote = createSelectionQuoteDraft('Pinned quote text', 456);
 
-        const prepared = buildSelectionQuotePreparedMessages({
+        const turnMessages = buildSelectionQuoteTurnMessages({
             draftQuote,
             pinnedQuote,
-            baseMessages: [resourceMessage, userMessage],
         });
+        const requestMessages = [...turnMessages, resourceMessage, userMessage];
+        const persistedMessages = stripSelectionQuoteMessages(requestMessages);
 
-        expect(prepared.messages.map((message) => message.role)).toEqual(['system', 'system', 'system', 'user']);
-        expect(prepared.messages[0]?.content).toContain('Draft quote text');
-        expect(prepared.messages[1]?.content).toContain('Pinned quote text');
-        expect(prepared.messages[2]).toEqual(resourceMessage);
-        expect(prepared.messages[3]).toEqual(userMessage);
+        expect(requestMessages.map((message) => message.role)).toEqual(['system', 'system', 'system', 'user']);
+        expect(requestMessages[0]?.content).toContain('Draft quote text');
+        expect(requestMessages[1]?.content).toContain('Pinned quote text');
+        expect(requestMessages[2]).toEqual(resourceMessage);
+        expect(requestMessages[3]).toEqual(userMessage);
+        expect(persistedMessages).toEqual([resourceMessage, userMessage]);
     });
 
     it('keeps the draft quote when the prepared turn does not complete', () => {

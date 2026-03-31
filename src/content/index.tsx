@@ -41,8 +41,9 @@ import {
 } from './selection-quote-ui.js';
 import { registerSelectionQuoteRuntimeListener } from './selection-quote-runtime.js';
 import {
-    buildSelectionQuotePreparedMessages,
+    buildSelectionQuoteTurnMessages,
     shouldClearSelectionQuoteDraft,
+    stripSelectionQuoteMessages,
 } from './selection-quote-send.js';
 
 // Hooks
@@ -346,21 +347,16 @@ const ChatWidget = () => {
             draftQuote,
             pinnedQuote: activeConv?.pinnedQuote ?? null,
         };
-        let shouldClearDraftQuoteAfterCommit = false;
+        const turnQuoteMessages = buildSelectionQuoteTurnMessages(selectionQuoteState);
+        const shouldClearDraftQuoteAfterCommit =
+            !!selectionQuoteState.draftQuote && selectionQuoteState.draftQuote.text.trim().length > 0;
         let turnCompleted = false;
 
         await runChatAction({
             activeConversation: activeConv,
             createConversation,
             prepareMessages: async () => {
-                const baseMessages = await params.buildBaseMessages();
-                const prepared = buildSelectionQuotePreparedMessages({
-                    draftQuote: selectionQuoteState.draftQuote,
-                    pinnedQuote: selectionQuoteState.pinnedQuote,
-                    baseMessages,
-                });
-                shouldClearDraftQuoteAfterCommit = prepared.shouldClearDraftQuoteAfterCommit;
-                return prepared.messages;
+                return params.buildBaseMessages();
             },
             upsertConversation: (conversation) => {
                 upsertConversation(conversation);
@@ -369,16 +365,16 @@ const ChatWidget = () => {
             setLoading: setIsLoading,
             runPreparedTurn: async (conversation) => {
                 const messages = await chatRuntime.runPreparedTurn({
-                    conversationMessages: conversation.messages,
+                    conversationMessages: [...turnQuoteMessages, ...conversation.messages],
                     baseConversation: conversation,
                     updateConversation: (messages) => {
-                        upsertConversation({ ...conversation, messages });
+                        upsertConversation({ ...conversation, messages: stripSelectionQuoteMessages(messages) });
                     },
                     persistConversation: persistConv,
                     signal: abortControllerRef.current?.signal,
                 });
                 turnCompleted = true;
-                return { ...conversation, messages };
+                return { ...conversation, messages: stripSelectionQuoteMessages(messages) };
             },
             persistConversation: persistConv,
         });

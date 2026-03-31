@@ -19,11 +19,12 @@ function buildSelectionQuoteMessage(params: {
         params.kind === 'draft'
             ? 'Selected page text for this conversation turn:'
             : 'Pinned selected page text for this conversation:';
+    const tagName = params.kind === 'draft' ? 'selection_quote' : 'pinned_selection_quote';
 
     return {
         id: buildSelectionQuoteMessageId(params.kind, params.quote.createdAt),
         role: 'system',
-        content: `${prefix}\n\n${text}`,
+        content: `${prefix}\n\n<${tagName}>\n${text}\n</${tagName}>`,
         timestamp: params.quote.createdAt,
         hidden: true,
     };

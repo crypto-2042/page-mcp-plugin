@@ -17,6 +17,7 @@ describe('selection-quote-context', () => {
             hidden: true,
         });
         expect(messages[0]?.content).toContain('Selected page text for this conversation turn:');
+        expect(messages[0]?.content).toContain('<selection_quote>');
         expect(messages[0]?.content).toContain('Draft quote text');
     });
 
@@ -31,6 +32,7 @@ describe('selection-quote-context', () => {
             hidden: true,
         });
         expect(messages[0]?.content).toContain('Pinned selected page text for this conversation:');
+        expect(messages[0]?.content).toContain('<pinned_selection_quote>');
         expect(messages[0]?.content).toContain('Pinned quote text');
     });
 

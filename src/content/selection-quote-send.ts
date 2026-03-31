@@ -1,23 +1,18 @@
 import type { ChatMessage, ConversationQuote } from '../shared/types.js';
 import { buildSelectionQuoteMessages } from './selection-quote-context.js';
 
-export function buildSelectionQuotePreparedMessages(params: {
+export function buildSelectionQuoteTurnMessages(params: {
     draftQuote?: ConversationQuote | null;
     pinnedQuote?: ConversationQuote | null;
-    baseMessages: ChatMessage[];
-}): {
-    messages: ChatMessage[];
-    shouldClearDraftQuoteAfterCommit: boolean;
-} {
-    const quoteMessages = buildSelectionQuoteMessages({
+}): ChatMessage[] {
+    return buildSelectionQuoteMessages({
         draftQuote: params.draftQuote ?? undefined,
         pinnedQuote: params.pinnedQuote ?? undefined,
     });
+}
 
-    return {
-        messages: [...quoteMessages, ...params.baseMessages],
-        shouldClearDraftQuoteAfterCommit: !!params.draftQuote && params.draftQuote.text.trim().length > 0,
-    };
+export function stripSelectionQuoteMessages(messages: ChatMessage[]): ChatMessage[] {
+    return messages.filter((message) => !message.id.startsWith('msg_selection_quote_'));
 }
 
 export function shouldClearSelectionQuoteDraft(params: {
