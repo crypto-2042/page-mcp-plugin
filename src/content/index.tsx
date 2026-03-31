@@ -7,7 +7,7 @@ import type {
 } from '@page-mcp/protocol';
 import { MAX_QUICK_PROMPTS } from '../shared/constants.js';
 import { generateConversationId, generateMessageId } from '../shared/id.js';
-import type { ChatMessage, Conversation, ConversationQuote, PluginMessage } from '../shared/types.js';
+import type { ChatMessage, Conversation, ConversationQuote } from '../shared/types.js';
 import { generatePluginStyles } from './styles.js';
 import { renderMarkdown } from './markdown.js';
 import { formatToolResult } from './tool-result-format.js';
@@ -35,8 +35,8 @@ import { safeRuntimeMessage } from './safe-runtime.js';
 import { buildStreamRequestPayload } from './chat-stream.js';
 import {
     SelectionQuoteArea,
-    createSelectionQuoteDraft,
 } from './selection-quote-ui.js';
+import { registerSelectionQuoteRuntimeListener } from './selection-quote-runtime.js';
 
 // Hooks
 import { usePluginSettings } from './hooks/use-settings.js';
@@ -154,21 +154,10 @@ const ChatWidget = () => {
     }, [resources]);
 
     useEffect(() => {
-        const onRuntimeMessage = (message: PluginMessage) => {
-            if (!message || typeof message !== 'object') return;
-            if (message.type !== 'ADD_SELECTION_QUOTE') return;
-
-            const nextDraftQuote = createSelectionQuoteDraft(message.text);
-            if (!nextDraftQuote) return;
-
-            setDraftQuote(nextDraftQuote);
-            setPanelOpen(true);
-        };
-
-        chrome.runtime.onMessage.addListener(onRuntimeMessage as Parameters<typeof chrome.runtime.onMessage.addListener>[0]);
-        return () => {
-            chrome.runtime.onMessage.removeListener(onRuntimeMessage as Parameters<typeof chrome.runtime.onMessage.addListener>[0]);
-        };
+        return registerSelectionQuoteRuntimeListener({
+            onQuote: setDraftQuote,
+            onOpenPanel: () => setPanelOpen(true),
+        });
     }, []);
 
     const formatMessageTime = (timestamp: number): string => {
