@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Conversation, ConversationQuote, PluginMessage } from '../shared/types.js';
 import {
+    clearSelectionQuoteConversation,
     SelectionQuoteArea,
     createSelectionQuoteDraft,
     getSelectionQuoteDisplayState,
@@ -51,6 +52,7 @@ function renderPinnedSelectionQuote(quote: ConversationQuote | null, open: boole
             open,
             quote,
             pinned: true,
+            onClose: () => {},
         }),
     );
 }
@@ -131,6 +133,21 @@ describe('selection quote runtime listener', () => {
         expect(markup).not.toContain('First selection');
     });
 
+    it('prefers a new draft quote over a pinned quote', () => {
+        const pinnedQuote = createSelectionQuoteDraft('Pinned quote', 111);
+        const draftQuote = createSelectionQuoteDraft('Draft quote', 222);
+
+        expect(getSelectionQuoteDisplayState({
+            draftQuote,
+            activeConversation: {
+                pinnedQuote: pinnedQuote!,
+            },
+        })).toEqual({
+            quote: draftQuote!,
+            pinned: false,
+        });
+    });
+
     it('pins the draft quote onto the active conversation state', () => {
         const draftQuote = createSelectionQuoteDraft('Pinned quote text', 123);
         expect(draftQuote).not.toBeNull();
@@ -161,6 +178,23 @@ describe('selection quote runtime listener', () => {
         const markup = renderPinnedSelectionQuote(draftQuote, true);
         expect(markup).toContain('Pinned quote');
         expect(markup).toContain('Pinned quote text');
+    });
+
+    it('removes a pinned quote from a conversation', () => {
+        const pinnedQuote = createSelectionQuoteDraft('Conversation-level pinned quote', 456);
+        expect(pinnedQuote).not.toBeNull();
+
+        const conversationWithPinnedQuote: Conversation = {
+            id: 'conv-b',
+            title: 'Pinned Chat',
+            domain: 'example.com',
+            createdAt: 2,
+            updatedAt: 2,
+            messages: [],
+            pinnedQuote: pinnedQuote!,
+        };
+
+        expect(clearSelectionQuoteConversation(conversationWithPinnedQuote)).not.toHaveProperty('pinnedQuote');
     });
 
     it('loads and renders a pinned quote from the active conversation when switching conversations', () => {

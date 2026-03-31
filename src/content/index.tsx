@@ -35,6 +35,7 @@ import { safeRuntimeMessage } from './safe-runtime.js';
 import { buildStreamRequestPayload } from './chat-stream.js';
 import {
     SelectionQuoteArea,
+    clearSelectionQuoteConversation,
     getSelectionQuoteDisplayState,
     pinSelectionQuoteConversation,
 } from './selection-quote-ui.js';
@@ -271,6 +272,19 @@ const ChatWidget = () => {
 
         await persistConv(nextConversation);
         setDraftQuote(null);
+    };
+
+    const handleCloseSelectionQuote = async () => {
+        if (draftQuote) {
+            setDraftQuote(null);
+            return;
+        }
+
+        if (!activeConv?.pinnedQuote) return;
+
+        const nextConversation = clearSelectionQuoteConversation(activeConv);
+        await persistConv(nextConversation);
+        upsertConversation(nextConversation);
     };
 
     const selectionQuoteDisplay = getSelectionQuoteDisplayState({
@@ -643,7 +657,7 @@ const ChatWidget = () => {
                             open={panelOpen}
                             quote={selectionQuoteDisplay?.quote ?? null}
                             pinned={selectionQuoteDisplay?.pinned}
-                            onClose={draftQuote ? () => setDraftQuote(null) : undefined}
+                            onClose={handleCloseSelectionQuote}
                             onPin={draftQuote ? handlePinSelectionQuote : undefined}
                         />
 

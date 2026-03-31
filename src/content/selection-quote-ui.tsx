@@ -64,6 +64,11 @@ export function pinSelectionQuoteConversation(params: {
     };
 }
 
+export function clearSelectionQuoteConversation(conversation: Conversation): Conversation {
+    const { pinnedQuote: _pinnedQuote, ...rest } = conversation;
+    return rest;
+}
+
 export function truncateSelectionQuotePreviewText(text: string, maxChars: number = MAX_SELECTION_QUOTE_PREVIEW_CHARS): string {
     const normalized = normalizeSelectionQuoteText(text);
     if (normalized.length <= maxChars) return normalized;
@@ -72,7 +77,7 @@ export function truncateSelectionQuotePreviewText(text: string, maxChars: number
 
 export function SelectionQuoteChip(props: {
     quote: ConversationQuote;
-    onClose?: () => void;
+    onClose: () => void;
     onPin?: () => void;
     pinned?: boolean;
 }) {
@@ -101,17 +106,15 @@ export function SelectionQuoteChip(props: {
                 >
                     <Pin size={14} />
                 </button>
-                {props.onClose && (
-                    <button
-                        className="pmcp-selection-quote-btn pmcp-selection-quote-close"
-                        type="button"
-                        onClick={props.onClose}
-                        aria-label="Remove quote"
-                        title="Remove quote"
-                    >
-                        <X size={14} />
-                    </button>
-                )}
+                <button
+                    className="pmcp-selection-quote-btn pmcp-selection-quote-close"
+                    type="button"
+                    onClick={props.onClose}
+                    aria-label="Remove quote"
+                    title="Remove quote"
+                >
+                    <X size={14} />
+                </button>
             </div>
         </div>
     );
@@ -121,7 +124,7 @@ export function SelectionQuoteArea(props: {
     open: boolean;
     quote: ConversationQuote | null;
     pinned?: boolean;
-    onClose?: () => void;
+    onClose: () => void;
     onPin?: () => void;
 }) {
     if (!props.quote) return null;
