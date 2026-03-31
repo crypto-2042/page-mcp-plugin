@@ -116,7 +116,7 @@ Chat 组件支持：
 ### 前置条件
 
 - **Node.js** ≥ 18
-- **pnpm**（推荐）或 npm
+- **pnpm**（唯一支持的包管理器）
 - **Chrome** 或基于 Chromium 的浏览器（Manifest V3）
 
 ### 从源码构建
@@ -148,6 +148,12 @@ pnpm dev
 ```
 
 运行 `pnpm dev` 后，在 `chrome://extensions/` 中重新加载扩展即可生效。
+
+### 开发规则
+
+- 仅使用 `pnpm`。本仓库不支持 `npm` 或 `bun` 工作流。
+- 所有新增的用户可见文案都必须同时补齐 `en` 和 `zh` 国际化。
+- 使用现有图标体系：content/popup 使用 `lucide-react`，options 保持 `MaterialSymbolIcon`，不要再用文本占位来冒充图标。
 
 ---
 
