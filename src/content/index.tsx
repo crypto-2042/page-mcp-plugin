@@ -260,7 +260,16 @@ const ChatWidget = () => {
         setPendingToolConfirm(null);
     };
 
-    const handlePinSelectionQuote = async () => {
+    const handleToggleSelectionQuotePin = async () => {
+        if (!draftQuote && activeConv?.pinnedQuote) {
+            const pinnedQuote = activeConv.pinnedQuote;
+            const nextConversation = clearSelectionQuoteConversation(activeConv);
+            await persistConv(nextConversation);
+            upsertConversation(nextConversation);
+            setDraftQuote(pinnedQuote);
+            return;
+        }
+
         if (!draftQuote) return;
 
         const baseConversation = activeConv ?? createConversation();
@@ -299,6 +308,7 @@ const ChatWidget = () => {
         pinnedLabel: t('selectionQuotePinnedLabel') || 'Pinned quote',
         pinButtonLabel: t('selectionQuotePinButtonLabel') || 'Pin quote',
         pinnedButtonLabel: t('selectionQuotePinnedButtonLabel') || 'Pinned quote',
+        unpinButtonLabel: t('selectionQuoteUnpinButtonLabel') || 'Unpin quote',
         removeButtonLabel: t('selectionQuoteRemoveButtonLabel') || 'Remove quote',
     };
 
@@ -684,7 +694,7 @@ const ChatWidget = () => {
                             quote={selectionQuoteDisplay?.quote ?? null}
                             pinned={selectionQuoteDisplay?.pinned}
                             onClose={handleCloseSelectionQuote}
-                            onPin={draftQuote ? handlePinSelectionQuote : undefined}
+                            onPin={selectionQuoteDisplay ? handleToggleSelectionQuotePin : undefined}
                             labels={selectionQuoteLabels}
                         />
 

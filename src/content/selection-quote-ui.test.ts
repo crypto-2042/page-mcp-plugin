@@ -197,6 +197,32 @@ describe('selection quote runtime listener', () => {
         expect(clearSelectionQuoteConversation(conversationWithPinnedQuote)).not.toHaveProperty('pinnedQuote');
     });
 
+    it('can unpin a pinned quote back into a visible draft state', () => {
+        const pinnedQuote = createSelectionQuoteDraft('Pinned but unsent quote', 456);
+        expect(pinnedQuote).not.toBeNull();
+
+        const conversationWithPinnedQuote: Conversation = {
+            id: 'conv-b',
+            title: 'Pinned Chat',
+            domain: 'example.com',
+            createdAt: 2,
+            updatedAt: 2,
+            messages: [],
+            pinnedQuote: pinnedQuote!,
+        };
+
+        const clearedConversation = clearSelectionQuoteConversation(conversationWithPinnedQuote);
+
+        expect(clearedConversation).not.toHaveProperty('pinnedQuote');
+        expect(getSelectionQuoteDisplayState({
+            draftQuote: pinnedQuote!,
+            activeConversation: clearedConversation,
+        })).toEqual({
+            quote: pinnedQuote!,
+            pinned: false,
+        });
+    });
+
     it('loads and renders a pinned quote from the active conversation when switching conversations', () => {
         const pinnedQuote = createSelectionQuoteDraft('Conversation-level pinned quote', 456);
         expect(pinnedQuote).not.toBeNull();
@@ -255,6 +281,7 @@ describe('selection quote runtime listener', () => {
                     pinnedLabel: 'Localized pinned label',
                     pinButtonLabel: 'Localized pin button',
                     pinnedButtonLabel: 'Localized pinned button',
+                    unpinButtonLabel: 'Localized unpin button',
                     removeButtonLabel: 'Localized remove button',
                 },
             }),
@@ -263,6 +290,32 @@ describe('selection quote runtime listener', () => {
         expect(markup).toContain('Localized draft label');
         expect(markup).toContain('Localized pin button');
         expect(markup).toContain('Localized remove button');
+        expect(markup).not.toContain('title="Localized quote text"');
+    });
+
+    it('uses the unpin label for pinned quote actions', () => {
+        const quote = createSelectionQuoteDraft('Pinned localized quote text', 790);
+        expect(quote).not.toBeNull();
+
+        const markup = renderToStaticMarkup(
+            React.createElement(SelectionQuoteArea, {
+                open: true,
+                quote,
+                pinned: true,
+                onClose: () => {},
+                onPin: () => {},
+                labels: {
+                    draftLabel: 'Localized draft label',
+                    pinnedLabel: 'Localized pinned label',
+                    pinButtonLabel: 'Localized pin button',
+                    pinnedButtonLabel: 'Localized pinned button',
+                    unpinButtonLabel: 'Localized unpin button',
+                    removeButtonLabel: 'Localized remove button',
+                },
+            }),
+        );
+
+        expect(markup).toContain('aria-label="Localized unpin button"');
     });
 
     it('ignores blank selection text', () => {

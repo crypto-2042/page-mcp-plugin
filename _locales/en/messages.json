@@ -32,6 +32,9 @@
     "selectionQuotePinnedButtonLabel": {
         "message": "Pinned quote"
     },
+    "selectionQuoteUnpinButtonLabel": {
+        "message": "Unpin quote"
+    },
     "selectionQuoteRemoveButtonLabel": {
         "message": "Remove quote"
     },

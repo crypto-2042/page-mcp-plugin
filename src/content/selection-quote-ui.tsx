@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pin, X } from 'lucide-react';
+import { Pin, Quote, X } from 'lucide-react';
 import type { Conversation, ConversationQuote } from '../shared/types.js';
 
 export const MAX_SELECTION_QUOTE_PREVIEW_CHARS = 180;
@@ -9,6 +9,7 @@ const DEFAULT_SELECTION_QUOTE_LABELS = {
     pinnedLabel: 'Pinned quote',
     pinButtonLabel: 'Pin quote',
     pinnedButtonLabel: 'Pinned quote',
+    unpinButtonLabel: 'Unpin quote',
     removeButtonLabel: 'Remove quote',
 };
 
@@ -27,6 +28,7 @@ export type SelectionQuoteLabels = {
     pinnedLabel: string;
     pinButtonLabel: string;
     pinnedButtonLabel: string;
+    unpinButtonLabel: string;
     removeButtonLabel: string;
 };
 
@@ -105,11 +107,11 @@ export function SelectionQuoteChip(props: {
     return (
         <div className={`pmcp-selection-quote-chip ${isPinned ? 'pinned' : 'draft'}`}>
             <div className="pmcp-selection-quote-marker" aria-hidden="true">
-                <span className="pmcp-selection-quote-marker-icon">quote</span>
+                <Quote size={13} strokeWidth={2.1} />
             </div>
             <div className="pmcp-selection-quote-content">
                 <div className="pmcp-selection-quote-label">{isPinned ? labels.pinnedLabel : labels.draftLabel}</div>
-                <div className="pmcp-selection-quote-text" title={props.quote.text}>
+                <div className="pmcp-selection-quote-text">
                     {previewText}
                 </div>
             </div>
@@ -119,8 +121,7 @@ export function SelectionQuoteChip(props: {
                     type="button"
                     onClick={props.onPin}
                     disabled={!props.onPin}
-                    aria-label={isPinned ? labels.pinnedButtonLabel : labels.pinButtonLabel}
-                    title={isPinned ? labels.pinnedButtonLabel : labels.pinButtonLabel}
+                    aria-label={isPinned ? labels.unpinButtonLabel : labels.pinButtonLabel}
                 >
                     <Pin size={14} />
                 </button>
@@ -129,7 +130,6 @@ export function SelectionQuoteChip(props: {
                     type="button"
                     onClick={props.onClose}
                     aria-label={labels.removeButtonLabel}
-                    title={labels.removeButtonLabel}
                 >
                     <X size={14} />
                 </button>

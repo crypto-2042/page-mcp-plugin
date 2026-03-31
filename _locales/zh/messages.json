@@ -32,6 +32,9 @@
     "selectionQuotePinnedButtonLabel": {
         "message": "已固定引用"
     },
+    "selectionQuoteUnpinButtonLabel": {
+        "message": "取消固定"
+    },
     "selectionQuoteRemoveButtonLabel": {
         "message": "移除引用"
     },
