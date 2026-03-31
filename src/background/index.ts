@@ -14,10 +14,28 @@ import { extractStreamEventsFromBuffer } from './stream-events.js';
 
 const PROXY_TIMEOUT_MS = 30000;
 const AI_STREAM_PORT = 'PMCP_AI_STREAM';
+const SELECTION_QUOTE_CONTEXT_MENU_ID = 'pmcp-add-selection-quote';
 
 function normalizeApiKey(raw: string): string {
     const trimmed = (raw || '').trim();
     return trimmed.replace(/^Bearer\s+/i, '');
+}
+
+function isBlankSelectionText(selectionText?: string): boolean {
+    return !selectionText || selectionText.trim().length === 0;
+}
+
+function registerSelectionQuoteContextMenu() {
+    chrome.contextMenus.create({
+        id: SELECTION_QUOTE_CONTEXT_MENU_ID,
+        title: 'As Chat Resource',
+        contexts: ['selection'],
+    });
+
+    chrome.contextMenus.onClicked.addListener((info) => {
+        if (isBlankSelectionText(info.selectionText)) return;
+        // Forwarding to the content script is added in a later task.
+    });
 }
 
 // ---- Message Handler ----
@@ -127,6 +145,8 @@ chrome.runtime.onConnect.addListener((port) => {
         }
     });
 });
+
+registerSelectionQuoteContextMenu();
 
 async function handleMessage(msg: PluginMessage, sender: chrome.runtime.MessageSender): Promise<unknown> {
     switch (msg.type) {
