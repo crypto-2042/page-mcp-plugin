@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ChatMessage } from '../shared/types.js';
 import { createSelectionQuoteDraft } from './selection-quote-ui.js';
 import {
+    buildSelectionQuoteConversationMessages,
     buildSelectionQuoteTurnMessages,
     shouldClearSelectionQuoteDraft,
     stripSelectionQuoteMessages,
@@ -69,23 +70,34 @@ describe('selection quote send preparation', () => {
         expect(secondTurn[0]?.content).toContain('Pinned quote text');
     });
 
-    it('keeps quote ordering stable ahead of resource and user messages without persisting them', () => {
+    it('inserts quote messages immediately before current turn messages without persisting them', () => {
         const draftQuote = createSelectionQuoteDraft('Draft quote text', 123);
         const pinnedQuote = createSelectionQuoteDraft('Pinned quote text', 456);
+        const priorAssistantMessage: ChatMessage = {
+            id: 'msg_assistant_prev',
+            role: 'assistant',
+            content: 'Previous answer',
+            timestamp: 0,
+        };
 
         const turnMessages = buildSelectionQuoteTurnMessages({
             draftQuote,
             pinnedQuote,
         });
-        const requestMessages = [...turnMessages, resourceMessage, userMessage];
+        const requestMessages = buildSelectionQuoteConversationMessages({
+            priorMessages: [priorAssistantMessage],
+            quoteMessages: turnMessages,
+            turnMessages: [resourceMessage, userMessage],
+        });
         const persistedMessages = stripSelectionQuoteMessages(requestMessages);
 
-        expect(requestMessages.map((message) => message.role)).toEqual(['system', 'system', 'system', 'user']);
-        expect(requestMessages[0]?.content).toContain('Draft quote text');
-        expect(requestMessages[1]?.content).toContain('Pinned quote text');
-        expect(requestMessages[2]).toEqual(resourceMessage);
-        expect(requestMessages[3]).toEqual(userMessage);
-        expect(persistedMessages).toEqual([resourceMessage, userMessage]);
+        expect(requestMessages.map((message) => message.role)).toEqual(['assistant', 'system', 'system', 'system', 'user']);
+        expect(requestMessages[0]).toEqual(priorAssistantMessage);
+        expect(requestMessages[1]?.content).toContain('Draft quote text');
+        expect(requestMessages[2]?.content).toContain('Pinned quote text');
+        expect(requestMessages[3]).toEqual(resourceMessage);
+        expect(requestMessages[4]).toEqual(userMessage);
+        expect(persistedMessages).toEqual([priorAssistantMessage, resourceMessage, userMessage]);
     });
 
     it('keeps the draft quote when the prepared turn does not complete', () => {

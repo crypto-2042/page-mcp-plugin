@@ -11,6 +11,14 @@ export function buildSelectionQuoteTurnMessages(params: {
     });
 }
 
+export function buildSelectionQuoteConversationMessages(params: {
+    priorMessages: ChatMessage[];
+    turnMessages: ChatMessage[];
+    quoteMessages: ChatMessage[];
+}): ChatMessage[] {
+    return [...params.priorMessages, ...params.quoteMessages, ...params.turnMessages];
+}
+
 export function stripSelectionQuoteMessages(messages: ChatMessage[]): ChatMessage[] {
     return messages.filter((message) => !message.id.startsWith('msg_selection_quote_'));
 }
