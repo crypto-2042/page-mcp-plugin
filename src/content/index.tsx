@@ -34,7 +34,7 @@ import { runChatAction } from './mcp-chat-actions.js';
 import { safeRuntimeMessage } from './safe-runtime.js';
 import { buildStreamRequestPayload } from './chat-stream.js';
 import {
-    SelectionQuoteChip,
+    SelectionQuoteArea,
     createSelectionQuoteDraft,
 } from './selection-quote-ui.js';
 
@@ -632,14 +632,11 @@ const ChatWidget = () => {
                             </div>
                         )}
 
-                        {draftQuote && (
-                            <div className="pmcp-selection-quote-strip">
-                                <SelectionQuoteChip
-                                    quote={draftQuote}
-                                    onClose={() => setDraftQuote(null)}
-                                />
-                            </div>
-                        )}
+                        <SelectionQuoteArea
+                            open={panelOpen}
+                            quote={draftQuote}
+                            onClose={() => setDraftQuote(null)}
+                        />
 
                         <div className="pmcp-input-area">
                             {resources.length > 0 && (

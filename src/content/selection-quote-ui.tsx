@@ -78,3 +78,20 @@ export function SelectionQuoteChip(props: {
         </div>
     );
 }
+
+export function SelectionQuoteArea(props: {
+    open: boolean;
+    quote: ConversationQuote | null;
+    onClose: () => void;
+}) {
+    if (!props.quote) return null;
+
+    return (
+        <div className={`pmcp-selection-quote-strip ${props.open ? 'open' : ''}`}>
+            <SelectionQuoteChip
+                quote={props.quote}
+                onClose={props.onClose}
+            />
+        </div>
+    );
+}

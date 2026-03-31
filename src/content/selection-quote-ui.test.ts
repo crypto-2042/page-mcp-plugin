@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
+import React from 'react';
 import {
-    MAX_SELECTION_QUOTE_PREVIEW_CHARS,
-    SelectionQuoteChip,
+    SelectionQuoteArea,
     applyIncomingSelectionQuote,
-    truncateSelectionQuotePreviewText,
+    createSelectionQuoteDraft,
 } from './selection-quote-ui.js';
 
-describe('selection-quote-ui', () => {
-    it('opens the panel and shows the chip when a selection quote arrives', () => {
+describe('selection quote chat ui', () => {
+    it('opens the quote area and shows the chip when a selection quote arrives', () => {
         const next = applyIncomingSelectionQuote(
             { draftQuote: null, panelOpen: false },
             'Selected text from the page',
@@ -22,12 +22,14 @@ describe('selection-quote-ui', () => {
         });
 
         const markup = renderToStaticMarkup(
-            <SelectionQuoteChip
-                quote={next.draftQuote!}
-                onClose={() => {}}
-            />,
+            React.createElement(SelectionQuoteArea, {
+                open: next.panelOpen,
+                quote: next.draftQuote,
+                onClose: () => {},
+            }),
         );
 
+        expect(markup).toContain('pmcp-selection-quote-strip open');
         expect(markup).toContain('Selection quote');
         expect(markup).toContain('Selected text from the page');
     });
@@ -46,22 +48,20 @@ describe('selection-quote-ui', () => {
             createdAt: 222,
         });
         expect(second.draftQuote?.text).not.toBe(first.draftQuote?.text);
-    });
-
-    it('truncates quote text in the chip preview', () => {
-        const longText = 'x'.repeat(MAX_SELECTION_QUOTE_PREVIEW_CHARS + 20);
-        const preview = truncateSelectionQuotePreviewText(longText);
-
-        expect(preview.length).toBe(MAX_SELECTION_QUOTE_PREVIEW_CHARS + 1);
-        expect(preview).toBe(`${'x'.repeat(MAX_SELECTION_QUOTE_PREVIEW_CHARS)}…`);
 
         const markup = renderToStaticMarkup(
-            <SelectionQuoteChip
-                quote={{ text: longText, createdAt: 333 }}
-                onClose={() => {}}
-            />,
+            React.createElement(SelectionQuoteArea, {
+                open: second.panelOpen,
+                quote: second.draftQuote,
+                onClose: () => {},
+            }),
         );
 
-        expect(markup).toContain(preview);
+        expect(markup).toContain('Second selection');
+        expect(markup).not.toContain('First selection');
+    });
+
+    it('ignores blank selection text', () => {
+        expect(createSelectionQuoteDraft('   ')).toBeNull();
     });
 });
