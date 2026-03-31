@@ -39,6 +39,11 @@ export interface StoredMcpSnapshot {
     resources: StoredMcpResource[];
 }
 
+export interface ConversationQuote {
+    text: string;
+    createdAt: number;
+}
+
 /** Plugin settings persisted in chrome.storage.local */
 export interface PluginSettings {
     // AI Model
@@ -78,6 +83,7 @@ export interface Conversation {
     createdAt: number;
     updatedAt: number;
     messages: ChatMessage[];
+    pinnedQuote?: ConversationQuote;
 }
 
 /** Chat message */
@@ -210,6 +216,7 @@ export type PluginMessage =
     | { type: 'DELETE_MCP_SKILLS_REPO'; repoId: string; }
     | { type: 'GET_ACTIVE_TAB_CHAT_STATUS'; }
     | { type: 'OPEN_OPTIONS'; domain?: string; hasNativeChat?: boolean; }
+    | { type: 'ADD_SELECTION_QUOTE'; text: string; }
     | { type: 'CALL_REMOTE_TOOL'; apiBase: string; repositoryId: string; marketOrigin: string; toolName: string; args: Record<string, unknown>; }
     | { type: 'EXECUTE_REMOTE_TOOL_IN_PAGE'; executeStr: string; args: Record<string, unknown>; };
 
