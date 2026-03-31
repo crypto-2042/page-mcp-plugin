@@ -10,6 +10,7 @@ const runtimeOnInstalledAddListener = vi.fn();
 const runtimeOnStartupAddListener = vi.fn();
 const runtimeOpenOptionsPage = vi.fn();
 const tabsSendMessage = vi.fn(async () => ({}));
+const tabsQuery = vi.fn(async () => [{ id: 123 }]);
 const actionOnClickedAddListener = vi.fn();
 
 let contextMenuClickedHandler: ((info: { selectionText?: string }) => void | Promise<void>) | null = null;
@@ -55,7 +56,7 @@ function installChromeMock() {
         },
         tabs: {
             sendMessage: tabsSendMessage,
-            query: vi.fn(async () => []),
+            query: tabsQuery,
             create: vi.fn(),
         },
         action: {
@@ -111,5 +112,26 @@ describe('background selection quote context menu', () => {
         await contextMenuClickedHandler?.({ selectionText: '   ' });
 
         expect(tabsSendMessage).not.toHaveBeenCalled();
+    });
+
+    it('forwards a non-blank selection quote to the active tab', async () => {
+        await loadBackgroundModule();
+
+        await contextMenuClickedHandler?.({ selectionText: 'selected text' });
+
+        expect(tabsQuery).toHaveBeenCalledWith({ active: true, currentWindow: true });
+        expect(tabsSendMessage).toHaveBeenCalledWith(123, {
+            type: 'ADD_SELECTION_QUOTE',
+            text: 'selected text',
+        });
+    });
+
+    it('silently ignores sendMessage failures', async () => {
+        tabsSendMessage.mockRejectedValueOnce(new Error('tab unavailable'));
+        await loadBackgroundModule();
+
+        contextMenuClickedHandler?.({ selectionText: 'selected text' });
+        await Promise.resolve();
+        expect(tabsSendMessage).toHaveBeenCalledTimes(1);
     });
 });

@@ -34,10 +34,23 @@ async function registerSelectionQuoteContextMenu() {
     });
 }
 
+async function forwardSelectionQuoteToActiveTab(selectionText: string) {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tabId = tabs.find((tab) => typeof tab.id === 'number')?.id;
+    if (typeof tabId !== 'number') return;
+
+    await chrome.tabs.sendMessage(tabId, {
+        type: 'ADD_SELECTION_QUOTE',
+        text: selectionText,
+    }).catch(() => {
+        // Selection quotes are best-effort in v1.
+    });
+}
+
 function registerSelectionQuoteLifecycle() {
     chrome.contextMenus.onClicked.addListener((info) => {
         if (isBlankSelectionText(info.selectionText)) return;
-        // Forwarding to the content script is added in a later task.
+        void forwardSelectionQuoteToActiveTab(info.selectionText);
     });
 
     chrome.runtime.onInstalled.addListener(() => {
