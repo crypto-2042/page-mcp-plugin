@@ -375,8 +375,19 @@ const ChatWidget = () => {
         if (shouldClearSelectionQuoteDraft({
             shouldClearDraftQuoteAfterCommit,
             turnCompleted,
+            participatingDraft: selectionQuoteState.draftQuote,
+            currentDraft: draftQuote,
         })) {
-            setDraftQuote(null);
+            setDraftQuote((currentDraft) => (
+                shouldClearSelectionQuoteDraft({
+                    shouldClearDraftQuoteAfterCommit,
+                    turnCompleted,
+                    participatingDraft: selectionQuoteState.draftQuote,
+                    currentDraft,
+                })
+                    ? null
+                    : currentDraft
+            ));
         }
     };
 

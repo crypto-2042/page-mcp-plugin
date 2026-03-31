@@ -96,6 +96,8 @@ describe('selection quote send preparation', () => {
         expect(shouldClearSelectionQuoteDraft({
             shouldClearDraftQuoteAfterCommit: true,
             turnCompleted: false,
+            currentDraft: createSelectionQuoteDraft('Draft quote text', 123),
+            participatingDraft: createSelectionQuoteDraft('Draft quote text', 123),
         })).toBe(false);
     });
 
@@ -103,6 +105,17 @@ describe('selection quote send preparation', () => {
         expect(shouldClearSelectionQuoteDraft({
             shouldClearDraftQuoteAfterCommit: true,
             turnCompleted: true,
+            currentDraft: createSelectionQuoteDraft('Draft quote text', 123),
+            participatingDraft: createSelectionQuoteDraft('Draft quote text', 123),
         })).toBe(true);
+    });
+
+    it('preserves a replacement draft when an older send completes', () => {
+        expect(shouldClearSelectionQuoteDraft({
+            shouldClearDraftQuoteAfterCommit: true,
+            turnCompleted: true,
+            currentDraft: createSelectionQuoteDraft('Draft B', 456),
+            participatingDraft: createSelectionQuoteDraft('Draft A', 123),
+        })).toBe(false);
     });
 });

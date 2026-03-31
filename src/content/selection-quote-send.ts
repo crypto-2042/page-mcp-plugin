@@ -23,6 +23,19 @@ export function buildSelectionQuotePreparedMessages(params: {
 export function shouldClearSelectionQuoteDraft(params: {
     shouldClearDraftQuoteAfterCommit: boolean;
     turnCompleted: boolean;
+    currentDraft?: ConversationQuote | null;
+    participatingDraft?: ConversationQuote | null;
 }): boolean {
-    return params.shouldClearDraftQuoteAfterCommit && params.turnCompleted;
+    if (!params.shouldClearDraftQuoteAfterCommit || !params.turnCompleted) {
+        return false;
+    }
+
+    if (!params.currentDraft || !params.participatingDraft) {
+        return false;
+    }
+
+    return (
+        params.currentDraft.createdAt === params.participatingDraft.createdAt
+        && params.currentDraft.text === params.participatingDraft.text
+    );
 }
