@@ -53,8 +53,9 @@ async function forwardSelectionQuoteToActiveTab(selectionText: string) {
 
 function registerSelectionQuoteLifecycle() {
     chrome.contextMenus.onClicked.addListener(async (info) => {
-        if (isBlankSelectionText(info.selectionText)) return;
-        await forwardSelectionQuoteToActiveTab(info.selectionText);
+        const selectionText = info.selectionText;
+        if (typeof selectionText !== 'string' || isBlankSelectionText(selectionText)) return;
+        await forwardSelectionQuoteToActiveTab(selectionText);
     });
 
     chrome.runtime.onInstalled.addListener(() => {

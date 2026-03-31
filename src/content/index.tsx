@@ -7,7 +7,7 @@ import type {
 } from '@page-mcp/protocol';
 import { MAX_QUICK_PROMPTS } from '../shared/constants.js';
 import { generateConversationId, generateMessageId } from '../shared/id.js';
-import type { ChatMessage, Conversation } from '../shared/types.js';
+import type { ChatMessage, Conversation, ConversationQuote, PluginMessage } from '../shared/types.js';
 import { generatePluginStyles } from './styles.js';
 import { renderMarkdown } from './markdown.js';
 import { formatToolResult } from './tool-result-format.js';
@@ -33,6 +33,10 @@ import { createMcpChatRuntime } from './mcp-chat-runtime.js';
 import { runChatAction } from './mcp-chat-actions.js';
 import { safeRuntimeMessage } from './safe-runtime.js';
 import { buildStreamRequestPayload } from './chat-stream.js';
+import {
+    SelectionQuoteChip,
+    createSelectionQuoteDraft,
+} from './selection-quote-ui.js';
 
 // Hooks
 import { usePluginSettings } from './hooks/use-settings.js';
@@ -112,6 +116,7 @@ const ChatWidget = () => {
     const [resourcePanelOpen, setResourcePanelOpen] = useState(false);
     const [inputText, setInputText] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [draftQuote, setDraftQuote] = useState<ConversationQuote | null>(null);
     const [attachedResourceUris, setAttachedResourceUris] = useState<string[]>([]);
     const [expandedToolDetails, setExpandedToolDetails] = useState<Record<string, boolean>>({});
 
@@ -147,6 +152,24 @@ const ChatWidget = () => {
     useEffect(() => {
         setAttachedResourceUris((current) => getInitialAttachedResourceUris(resources, current));
     }, [resources]);
+
+    useEffect(() => {
+        const onRuntimeMessage = (message: PluginMessage) => {
+            if (!message || typeof message !== 'object') return;
+            if (message.type !== 'ADD_SELECTION_QUOTE') return;
+
+            const nextDraftQuote = createSelectionQuoteDraft(message.text);
+            if (!nextDraftQuote) return;
+
+            setDraftQuote(nextDraftQuote);
+            setPanelOpen(true);
+        };
+
+        chrome.runtime.onMessage.addListener(onRuntimeMessage as Parameters<typeof chrome.runtime.onMessage.addListener>[0]);
+        return () => {
+            chrome.runtime.onMessage.removeListener(onRuntimeMessage as Parameters<typeof chrome.runtime.onMessage.addListener>[0]);
+        };
+    }, []);
 
     const formatMessageTime = (timestamp: number): string => {
         const d = new Date(timestamp);
@@ -606,6 +629,15 @@ const ChatWidget = () => {
                                         </label>
                                     );
                                 })}
+                            </div>
+                        )}
+
+                        {draftQuote && (
+                            <div className="pmcp-selection-quote-strip">
+                                <SelectionQuoteChip
+                                    quote={draftQuote}
+                                    onClose={() => setDraftQuote(null)}
+                                />
                             </div>
                         )}
 
