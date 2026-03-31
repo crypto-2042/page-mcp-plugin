@@ -89,6 +89,7 @@ The chat widget supports:
 - Automatic MCP tool calling with confirmation
 - Markdown rendering with syntax highlighting
 - Domain-isolated conversation history
+- Right-click selected page text to attach it as chat context, with one-shot drafts and per-conversation pinned quotes
 - Light / Dark / System theme modes
 
 ### 🏪 Remote MCP/Skills Marketplace
