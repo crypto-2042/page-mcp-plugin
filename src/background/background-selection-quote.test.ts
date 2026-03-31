@@ -6,11 +6,15 @@ const contextMenusOnClickedAddListener = vi.fn();
 const runtimeOnMessageAddListener = vi.fn();
 const runtimeOnMessageExternalAddListener = vi.fn();
 const runtimeOnConnectAddListener = vi.fn();
+const runtimeOnInstalledAddListener = vi.fn();
+const runtimeOnStartupAddListener = vi.fn();
 const runtimeOpenOptionsPage = vi.fn();
 const tabsSendMessage = vi.fn(async () => ({}));
 const actionOnClickedAddListener = vi.fn();
 
 let contextMenuClickedHandler: ((info: { selectionText?: string }) => void | Promise<void>) | null = null;
+let installedHandler: (() => void | Promise<void>) | null = null;
+let startupHandler: (() => void | Promise<void>) | null = null;
 
 function installChromeMock() {
     vi.stubGlobal('chrome', {
@@ -33,6 +37,18 @@ function installChromeMock() {
             },
             onConnect: {
                 addListener: runtimeOnConnectAddListener,
+            },
+            onInstalled: {
+                addListener: (listener: () => void | Promise<void>) => {
+                    installedHandler = listener;
+                    runtimeOnInstalledAddListener(listener);
+                },
+            },
+            onStartup: {
+                addListener: (listener: () => void | Promise<void>) => {
+                    startupHandler = listener;
+                    runtimeOnStartupAddListener(listener);
+                },
             },
             openOptionsPage: runtimeOpenOptionsPage,
             getURL: (path: string) => `chrome-extension://test/${path}`,
@@ -61,17 +77,32 @@ async function loadBackgroundModule() {
 beforeEach(() => {
     vi.clearAllMocks();
     contextMenuClickedHandler = null;
+    installedHandler = null;
+    startupHandler = null;
 });
 
 describe('background selection quote context menu', () => {
-    it('creates the selection quote context menu with selection context', async () => {
+    it('registers restart-safe startup and install handlers', async () => {
         await loadBackgroundModule();
 
-        expect(contextMenusCreate).toHaveBeenCalledWith(expect.objectContaining({
+        expect(contextMenusCreate).not.toHaveBeenCalled();
+        expect(runtimeOnInstalledAddListener).toHaveBeenCalledTimes(1);
+        expect(runtimeOnStartupAddListener).toHaveBeenCalledTimes(1);
+        expect(contextMenusOnClickedAddListener).toHaveBeenCalledTimes(1);
+    });
+
+    it('recreates the selection quote context menu on startup without duplicates', async () => {
+        await loadBackgroundModule();
+
+        await startupHandler?.();
+        await startupHandler?.();
+
+        expect(contextMenusRemoveAll).toHaveBeenCalledTimes(2);
+        expect(contextMenusCreate).toHaveBeenCalledTimes(2);
+        expect(contextMenusCreate).toHaveBeenNthCalledWith(1, expect.objectContaining({
             id: 'pmcp-add-selection-quote',
             contexts: ['selection'],
         }));
-        expect(contextMenusOnClickedAddListener).toHaveBeenCalledTimes(1);
     });
 
     it('ignores blank selection text', async () => {

@@ -25,16 +25,27 @@ function isBlankSelectionText(selectionText?: string): boolean {
     return !selectionText || selectionText.trim().length === 0;
 }
 
-function registerSelectionQuoteContextMenu() {
+async function registerSelectionQuoteContextMenu() {
+    await chrome.contextMenus.removeAll();
     chrome.contextMenus.create({
         id: SELECTION_QUOTE_CONTEXT_MENU_ID,
         title: 'As Chat Resource',
         contexts: ['selection'],
     });
+}
 
+function registerSelectionQuoteLifecycle() {
     chrome.contextMenus.onClicked.addListener((info) => {
         if (isBlankSelectionText(info.selectionText)) return;
         // Forwarding to the content script is added in a later task.
+    });
+
+    chrome.runtime.onInstalled.addListener(() => {
+        void registerSelectionQuoteContextMenu();
+    });
+
+    chrome.runtime.onStartup.addListener(() => {
+        void registerSelectionQuoteContextMenu();
     });
 }
 
@@ -146,7 +157,7 @@ chrome.runtime.onConnect.addListener((port) => {
     });
 });
 
-registerSelectionQuoteContextMenu();
+registerSelectionQuoteLifecycle();
 
 async function handleMessage(msg: PluginMessage, sender: chrome.runtime.MessageSender): Promise<unknown> {
     switch (msg.type) {
