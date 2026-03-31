@@ -1,18 +1,24 @@
 # Repo Rules
 
+## Repo Hygiene
+
+- Never commit machine-specific absolute filesystem paths.
+- Do not add local-only paths such as `/Users/...`, `/home/...`, `C:\...`, `file://...`, or editor-specific local URIs to tracked docs, rules, fixtures, tests, or source comments unless explicitly required and reviewed.
+- Prefer plain relative paths like `pnpm-lock.yaml` or `_locales/en/messages.json`.
+
 ## Package Manager
 
 - Use `pnpm` only.
 - Do not use `npm` or `bun` for install, build, test, or lockfile updates.
-- Treat [`pnpm-lock.yaml`](/Users/zhaojr/workspace/antigravity/hang/page-mcp-plugin/.worktrees/selection-quote-chat-context/pnpm-lock.yaml) as the single source of truth for dependency resolution.
+- Treat `pnpm-lock.yaml` as the single source of truth for dependency resolution.
 - Do not add `package-lock.json`, `bun.lock`, or other package-manager lockfiles.
 
 ## i18n
 
 - Any new user-visible string must be localized.
 - Update both:
-  - [_locales/en/messages.json](/Users/zhaojr/workspace/antigravity/hang/page-mcp-plugin/.worktrees/selection-quote-chat-context/_locales/en/messages.json)
-  - [_locales/zh/messages.json](/Users/zhaojr/workspace/antigravity/hang/page-mcp-plugin/.worktrees/selection-quote-chat-context/_locales/zh/messages.json)
+  - `_locales/en/messages.json`
+  - `_locales/zh/messages.json`
 - Prefer existing `t(...)` / `chrome.i18n.getMessage(...)` flows over inline strings.
 - Inline hardcoded strings are acceptable only in tests or in non-user-facing internal code paths.
 

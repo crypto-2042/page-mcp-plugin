@@ -154,6 +154,7 @@ After running `pnpm dev`, reload the extension in `chrome://extensions/` to pick
 - Use `pnpm` only. This repository does not support `npm` or `bun` workflows.
 - Localize all new user-visible strings in both `en` and `zh`.
 - Use the established icon systems (`lucide-react` in content/popup UI, `MaterialSymbolIcon` in options). Do not use text placeholders as icons.
+- Do not commit machine-specific absolute filesystem paths into repo files.
 
 ---
 

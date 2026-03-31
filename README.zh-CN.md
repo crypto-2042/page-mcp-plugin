@@ -154,6 +154,7 @@ pnpm dev
 - 仅使用 `pnpm`。本仓库不支持 `npm` 或 `bun` 工作流。
 - 所有新增的用户可见文案都必须同时补齐 `en` 和 `zh` 国际化。
 - 使用现有图标体系：content/popup 使用 `lucide-react`，options 保持 `MaterialSymbolIcon`，不要再用文本占位来冒充图标。
+- 不要把机器相关的本地绝对路径提交进仓库文件。
 
 ---
 
