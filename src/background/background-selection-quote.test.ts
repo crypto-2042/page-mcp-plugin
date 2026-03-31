@@ -126,12 +126,19 @@ describe('background selection quote context menu', () => {
         });
     });
 
+    it('silently ignores query failures', async () => {
+        tabsQuery.mockRejectedValueOnce(new Error('query unavailable'));
+        await loadBackgroundModule();
+
+        await expect(contextMenuClickedHandler?.({ selectionText: 'selected text' })).resolves.toBeUndefined();
+        expect(tabsSendMessage).not.toHaveBeenCalled();
+    });
+
     it('silently ignores sendMessage failures', async () => {
         tabsSendMessage.mockRejectedValueOnce(new Error('tab unavailable'));
         await loadBackgroundModule();
 
-        contextMenuClickedHandler?.({ selectionText: 'selected text' });
-        await Promise.resolve();
+        await expect(contextMenuClickedHandler?.({ selectionText: 'selected text' })).resolves.toBeUndefined();
         expect(tabsSendMessage).toHaveBeenCalledTimes(1);
     });
 });

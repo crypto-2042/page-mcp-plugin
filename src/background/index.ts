@@ -35,22 +35,26 @@ async function registerSelectionQuoteContextMenu() {
 }
 
 async function forwardSelectionQuoteToActiveTab(selectionText: string) {
-    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-    const tabId = tabs.find((tab) => typeof tab.id === 'number')?.id;
-    if (typeof tabId !== 'number') return;
+    try {
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        const tabId = tabs.find((tab) => typeof tab.id === 'number')?.id;
+        if (typeof tabId !== 'number') return;
 
-    await chrome.tabs.sendMessage(tabId, {
-        type: 'ADD_SELECTION_QUOTE',
-        text: selectionText,
-    }).catch(() => {
+        await chrome.tabs.sendMessage(tabId, {
+            type: 'ADD_SELECTION_QUOTE',
+            text: selectionText,
+        }).catch(() => {
+            // Selection quotes are best-effort in v1.
+        });
+    } catch {
         // Selection quotes are best-effort in v1.
-    });
+    }
 }
 
 function registerSelectionQuoteLifecycle() {
-    chrome.contextMenus.onClicked.addListener((info) => {
+    chrome.contextMenus.onClicked.addListener(async (info) => {
         if (isBlankSelectionText(info.selectionText)) return;
-        void forwardSelectionQuoteToActiveTab(info.selectionText);
+        await forwardSelectionQuoteToActiveTab(info.selectionText);
     });
 
     chrome.runtime.onInstalled.addListener(() => {
