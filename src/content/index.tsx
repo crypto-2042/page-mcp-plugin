@@ -39,6 +39,7 @@ import {
     pinSelectionQuoteConversation,
 } from './selection-quote-ui.js';
 import { registerSelectionQuoteRuntimeListener } from './selection-quote-runtime.js';
+import { buildSelectionQuotePreparedMessages } from './selection-quote-send.js';
 
 // Hooks
 import { usePluginSettings } from './hooks/use-settings.js';
@@ -303,25 +304,35 @@ const ChatWidget = () => {
         throw new Error(`Cannot read resource without a native MCP client: ${uri}`);
     };
 
-    const handleSend = async (text: string = inputText) => {
-        if (!text.trim() || isLoading) return;
-        setInputText('');
-        
-        abortControllerRef.current = new AbortController();
+    const runSelectionQuotePreparedTurn = async (params: {
+        buildBaseMessages: () => Promise<ChatMessage[]>;
+    }) => {
+        const selectionQuoteState = {
+            draftQuote,
+            pinnedQuote: activeConv?.pinnedQuote ?? null,
+        };
+        let shouldClearDraftQuoteAfterCommit = false;
 
         await runChatAction({
             activeConversation: activeConv,
             createConversation,
             prepareMessages: async () => {
-                const userMessage: ChatMessage = { id: generateMessageId(), role: 'user', content: text, timestamp: Date.now() };
-                const resourceMessages = await buildAttachedResourceMessages({
-                    selectedUris: attachedResourceUris,
-                    resources,
-                    readResource: handleReadResource,
+                const baseMessages = await params.buildBaseMessages();
+                const prepared = buildSelectionQuotePreparedMessages({
+                    draftQuote: selectionQuoteState.draftQuote,
+                    pinnedQuote: selectionQuoteState.pinnedQuote,
+                    baseMessages,
                 });
-                return [...resourceMessages, userMessage];
+                shouldClearDraftQuoteAfterCommit = prepared.shouldClearDraftQuoteAfterCommit;
+                return prepared.messages;
             },
-            upsertConversation,
+            upsertConversation: (conversation) => {
+                upsertConversation(conversation);
+                if (shouldClearDraftQuoteAfterCommit) {
+                    shouldClearDraftQuoteAfterCommit = false;
+                    setDraftQuote(null);
+                }
+            },
             setActiveConversationId: setActiveConvId,
             setLoading: setIsLoading,
             runPreparedTurn: async (conversation) => {
@@ -337,6 +348,25 @@ const ChatWidget = () => {
                 return { ...conversation, messages };
             },
             persistConversation: persistConv,
+        });
+    };
+
+    const handleSend = async (text: string = inputText) => {
+        if (!text.trim() || isLoading) return;
+        setInputText('');
+        
+        abortControllerRef.current = new AbortController();
+
+        await runSelectionQuotePreparedTurn({
+            buildBaseMessages: async () => {
+                const userMessage: ChatMessage = { id: generateMessageId(), role: 'user', content: text, timestamp: Date.now() };
+                const resourceMessages = await buildAttachedResourceMessages({
+                    selectedUris: attachedResourceUris,
+                    resources,
+                    readResource: handleReadResource,
+                });
+                return [...resourceMessages, userMessage];
+            },
         });
         abortControllerRef.current = null;
     };
@@ -359,10 +389,8 @@ const ChatWidget = () => {
             
             abortControllerRef.current = new AbortController();
 
-            await runChatAction({
-                activeConversation: activeConv,
-                createConversation,
-                prepareMessages: async () => {
+            await runSelectionQuotePreparedTurn({
+                buildBaseMessages: async () => {
                     const resourceMessages = await buildAttachedResourceMessages({
                         selectedUris: attachedResourceUris,
                         resources,
@@ -370,22 +398,6 @@ const ChatWidget = () => {
                     });
                     return [...resourceMessages, ...builtMessages];
                 },
-                upsertConversation,
-                setActiveConversationId: setActiveConvId,
-                setLoading: setIsLoading,
-                runPreparedTurn: async (conversation) => {
-                    const messages = await chatRuntime.runPreparedTurn({
-                        conversationMessages: conversation.messages,
-                        baseConversation: conversation,
-                        updateConversation: (messages) => {
-                            upsertConversation({ ...conversation, messages });
-                        },
-                        persistConversation: persistConv,
-                        signal: abortControllerRef.current?.signal,
-                    });
-                    return { ...conversation, messages };
-                },
-                persistConversation: persistConv,
             });
             abortControllerRef.current = null;
             return;
@@ -396,10 +408,8 @@ const ChatWidget = () => {
         
         abortControllerRef.current = new AbortController();
 
-        await runChatAction({
-            activeConversation: activeConv,
-            createConversation,
-            prepareMessages: async () => {
+        await runSelectionQuotePreparedTurn({
+            buildBaseMessages: async () => {
                 const resourceMessages = await buildAttachedResourceMessages({
                     selectedUris: attachedResourceUris,
                     resources,
@@ -411,22 +421,6 @@ const ChatWidget = () => {
                 });
                 return [...resourceMessages, ...promptMessages];
             },
-            upsertConversation,
-            setActiveConversationId: setActiveConvId,
-            setLoading: setIsLoading,
-            runPreparedTurn: async (conversation) => {
-                const messages = await chatRuntime.runPreparedTurn({
-                    conversationMessages: conversation.messages,
-                    baseConversation: conversation,
-                    updateConversation: (messages) => {
-                        upsertConversation({ ...conversation, messages });
-                    },
-                    persistConversation: persistConv,
-                    signal: abortControllerRef.current?.signal,
-                });
-                return { ...conversation, messages };
-            },
-            persistConversation: persistConv,
         });
         abortControllerRef.current = null;
     };
