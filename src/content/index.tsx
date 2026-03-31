@@ -35,6 +35,8 @@ import { safeRuntimeMessage } from './safe-runtime.js';
 import { buildStreamRequestPayload } from './chat-stream.js';
 import {
     SelectionQuoteArea,
+    getSelectionQuoteDisplayState,
+    pinSelectionQuoteConversation,
 } from './selection-quote-ui.js';
 import { registerSelectionQuoteRuntimeListener } from './selection-quote-runtime.js';
 
@@ -252,6 +254,28 @@ const ChatWidget = () => {
         pending.resolve(allowed);
         setPendingToolConfirm(null);
     };
+
+    const handlePinSelectionQuote = async () => {
+        if (!draftQuote) return;
+
+        const baseConversation = activeConv ?? createConversation();
+        if (!activeConv) {
+            setActiveConvId(baseConversation.id);
+        }
+
+        const nextConversation = pinSelectionQuoteConversation({
+            conversation: baseConversation,
+            quote: draftQuote,
+        });
+
+        await persistConv(nextConversation);
+        setDraftQuote(null);
+    };
+
+    const selectionQuoteDisplay = getSelectionQuoteDisplayState({
+        draftQuote,
+        activeConversation: activeConv,
+    });
 
 
 
@@ -623,8 +647,10 @@ const ChatWidget = () => {
 
                         <SelectionQuoteArea
                             open={panelOpen}
-                            quote={draftQuote}
-                            onClose={() => setDraftQuote(null)}
+                            quote={selectionQuoteDisplay?.quote ?? null}
+                            pinned={selectionQuoteDisplay?.pinned}
+                            onClose={draftQuote ? () => setDraftQuote(null) : undefined}
+                            onPin={draftQuote ? handlePinSelectionQuote : undefined}
                         />
 
                         <div className="pmcp-input-area">

@@ -2,8 +2,13 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { ConversationQuote, PluginMessage } from '../shared/types.js';
-import { SelectionQuoteArea } from './selection-quote-ui.js';
+import type { Conversation, ConversationQuote, PluginMessage } from '../shared/types.js';
+import {
+    SelectionQuoteArea,
+    createSelectionQuoteDraft,
+    getSelectionQuoteDisplayState,
+    pinSelectionQuoteConversation,
+} from './selection-quote-ui.js';
 import { registerSelectionQuoteRuntimeListener } from './selection-quote-runtime.js';
 
 const runtimeOnMessageAddListener = vi.fn();
@@ -36,6 +41,16 @@ function renderSelectionQuoteArea(quote: ConversationQuote | null, open: boolean
             open,
             quote,
             onClose: () => {},
+        }),
+    );
+}
+
+function renderPinnedSelectionQuote(quote: ConversationQuote | null, open: boolean) {
+    return renderToStaticMarkup(
+        React.createElement(SelectionQuoteArea, {
+            open,
+            quote,
+            pinned: true,
         }),
     );
 }
@@ -116,29 +131,82 @@ describe('selection quote runtime listener', () => {
         expect(markup).not.toContain('First selection');
     });
 
-    it('ignores blank selection text', () => {
-        const state = {
-            draftQuote: null as ConversationQuote | null,
-            panelOpen: false,
+    it('pins the draft quote onto the active conversation state', () => {
+        const draftQuote = createSelectionQuoteDraft('Pinned quote text', 123);
+        expect(draftQuote).not.toBeNull();
+
+        const activeConversation: Conversation = {
+            id: 'conv-a',
+            title: 'New Chat',
+            domain: 'example.com',
+            createdAt: 1,
+            updatedAt: 1,
+            messages: [],
         };
-        const setDraftQuote = vi.fn((quote: ConversationQuote) => {
-            state.draftQuote = quote;
-        });
-        const openPanel = vi.fn(() => {
-            state.panelOpen = true;
-        });
 
-        registerSelectionQuoteRuntimeListener({
-            onQuote: setDraftQuote,
-            onOpenPanel: openPanel,
+        const pinnedConversation = pinSelectionQuoteConversation({
+            conversation: activeConversation,
+            quote: draftQuote!,
         });
 
-        messageListener?.({ type: 'ADD_SELECTION_QUOTE', text: '   ' });
+        expect(pinnedConversation.pinnedQuote).toEqual(draftQuote);
+        expect(getSelectionQuoteDisplayState({
+            draftQuote: null,
+            activeConversation: pinnedConversation,
+        })).toEqual({
+            quote: draftQuote!,
+            pinned: true,
+        });
 
-        expect(setDraftQuote).not.toHaveBeenCalled();
-        expect(openPanel).not.toHaveBeenCalled();
-        expect(state.draftQuote).toBeNull();
-        expect(state.panelOpen).toBe(false);
-        expect(renderSelectionQuoteArea(state.draftQuote, state.panelOpen)).toBe('');
+        const markup = renderPinnedSelectionQuote(draftQuote, true);
+        expect(markup).toContain('Pinned quote');
+        expect(markup).toContain('Pinned quote text');
+    });
+
+    it('loads and renders a pinned quote from the active conversation when switching conversations', () => {
+        const pinnedQuote = createSelectionQuoteDraft('Conversation-level pinned quote', 456);
+        expect(pinnedQuote).not.toBeNull();
+
+        const conversationWithPinnedQuote: Conversation = {
+            id: 'conv-b',
+            title: 'Pinned Chat',
+            domain: 'example.com',
+            createdAt: 2,
+            updatedAt: 2,
+            messages: [],
+            pinnedQuote: pinnedQuote!,
+        };
+
+        const anotherConversation: Conversation = {
+            id: 'conv-c',
+            title: 'Another Chat',
+            domain: 'example.com',
+            createdAt: 3,
+            updatedAt: 3,
+            messages: [],
+        };
+
+        const display = getSelectionQuoteDisplayState({
+            draftQuote: null,
+            activeConversation: conversationWithPinnedQuote,
+        });
+
+        expect(display).toEqual({
+            quote: pinnedQuote!,
+            pinned: true,
+        });
+
+        expect(getSelectionQuoteDisplayState({
+            draftQuote: null,
+            activeConversation: anotherConversation,
+        })).toBeNull();
+
+        const markup = renderPinnedSelectionQuote(display?.quote ?? null, true);
+        expect(markup).toContain('Pinned quote');
+        expect(markup).toContain('Conversation-level pinned quote');
+    });
+
+    it('ignores blank selection text', () => {
+        expect(createSelectionQuoteDraft('   ')).toBeNull();
     });
 });

@@ -1,12 +1,17 @@
 import React from 'react';
 import { Pin, X } from 'lucide-react';
-import type { ConversationQuote } from '../shared/types.js';
+import type { Conversation, ConversationQuote } from '../shared/types.js';
 
 export const MAX_SELECTION_QUOTE_PREVIEW_CHARS = 180;
 
 export type SelectionQuoteUiState = {
     draftQuote: ConversationQuote | null;
     panelOpen: boolean;
+};
+
+export type SelectionQuoteDisplayState = {
+    quote: ConversationQuote;
+    pinned: boolean;
 };
 
 export function normalizeSelectionQuoteText(text: string): string {
@@ -28,6 +33,37 @@ export function applyIncomingSelectionQuote(current: SelectionQuoteUiState, text
     };
 }
 
+export function getSelectionQuoteDisplayState(params: {
+    draftQuote: ConversationQuote | null;
+    activeConversation: Pick<Conversation, 'pinnedQuote'> | null;
+}): SelectionQuoteDisplayState | null {
+    if (params.draftQuote) {
+        return {
+            quote: params.draftQuote,
+            pinned: false,
+        };
+    }
+
+    if (params.activeConversation?.pinnedQuote) {
+        return {
+            quote: params.activeConversation.pinnedQuote,
+            pinned: true,
+        };
+    }
+
+    return null;
+}
+
+export function pinSelectionQuoteConversation(params: {
+    conversation: Conversation;
+    quote: ConversationQuote;
+}): Conversation {
+    return {
+        ...params.conversation,
+        pinnedQuote: params.quote,
+    };
+}
+
 export function truncateSelectionQuotePreviewText(text: string, maxChars: number = MAX_SELECTION_QUOTE_PREVIEW_CHARS): string {
     const normalized = normalizeSelectionQuoteText(text);
     if (normalized.length <= maxChars) return normalized;
@@ -36,7 +72,7 @@ export function truncateSelectionQuotePreviewText(text: string, maxChars: number
 
 export function SelectionQuoteChip(props: {
     quote: ConversationQuote;
-    onClose: () => void;
+    onClose?: () => void;
     onPin?: () => void;
     pinned?: boolean;
 }) {
@@ -65,15 +101,17 @@ export function SelectionQuoteChip(props: {
                 >
                     <Pin size={14} />
                 </button>
-                <button
-                    className="pmcp-selection-quote-btn pmcp-selection-quote-close"
-                    type="button"
-                    onClick={props.onClose}
-                    aria-label="Remove quote"
-                    title="Remove quote"
-                >
-                    <X size={14} />
-                </button>
+                {props.onClose && (
+                    <button
+                        className="pmcp-selection-quote-btn pmcp-selection-quote-close"
+                        type="button"
+                        onClick={props.onClose}
+                        aria-label="Remove quote"
+                        title="Remove quote"
+                    >
+                        <X size={14} />
+                    </button>
+                )}
             </div>
         </div>
     );
@@ -82,7 +120,9 @@ export function SelectionQuoteChip(props: {
 export function SelectionQuoteArea(props: {
     open: boolean;
     quote: ConversationQuote | null;
-    onClose: () => void;
+    pinned?: boolean;
+    onClose?: () => void;
+    onPin?: () => void;
 }) {
     if (!props.quote) return null;
 
@@ -90,7 +130,9 @@ export function SelectionQuoteArea(props: {
         <div className={`pmcp-selection-quote-strip ${props.open ? 'open' : ''}`}>
             <SelectionQuoteChip
                 quote={props.quote}
+                pinned={props.pinned}
                 onClose={props.onClose}
+                onPin={props.onPin}
             />
         </div>
     );
