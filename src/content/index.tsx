@@ -28,11 +28,12 @@ import {
     type OpenAIStreamEvent,
 } from './mcp-openai.js';
 import { filterRenderableMessages } from './chat-message-visibility.js';
-import { getToolCallResultPayload } from './tool-call-display.js';
+import { getToolCallDisplaySections } from './tool-call-display.js';
 import { createMcpChatRuntime } from './mcp-chat-runtime.js';
 import { runChatAction } from './mcp-chat-actions.js';
 import { safeRuntimeMessage } from './safe-runtime.js';
 import { buildStreamRequestPayload } from './chat-stream.js';
+import { stopChatInputEventPropagation } from './chat-input-events.js';
 import {
     SelectionQuoteArea,
     clearSelectionQuoteConversation,
@@ -144,14 +145,6 @@ const ChatWidget = () => {
     };
 
     // --- Derived ---
-    const stopPageShortcutPropagation = (e: React.KeyboardEvent) => {
-        e.stopPropagation();
-        const native = e.nativeEvent as KeyboardEvent;
-        if (typeof native.stopImmediatePropagation === 'function') {
-            native.stopImmediatePropagation();
-        }
-    };
-
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
@@ -624,6 +617,7 @@ const ChatWidget = () => {
                             {filterRenderableMessages(activeConv?.messages ?? []).map((m, i) => {
                                 if (m.role === 'tool' && m.toolCalls?.[0]) {
                                     const call = m.toolCalls[0];
+                                    const displaySections = getToolCallDisplaySections(call);
 
                                     const messageId = m.id || String(i);
                                     const expanded = !!expandedToolDetails[messageId];
@@ -649,10 +643,24 @@ const ChatWidget = () => {
                                                         <span className="pmcp-tool-result-label">args:</span>
                                                         <pre>{formatToolResult(call.args)}</pre>
                                                     </div>
-                                                    <div className="pmcp-tool-result">
-                                                        <span className="pmcp-tool-result-label">result:</span>
-                                                        <pre>{formatToolResult(getToolCallResultPayload(call))}</pre>
-                                                    </div>
+                                                    {displaySections.textContent && (
+                                                        <div className="pmcp-tool-result">
+                                                            <span className="pmcp-tool-result-label">content:</span>
+                                                            <div className="pmcp-tool-result-text">{displaySections.textContent}</div>
+                                                        </div>
+                                                    )}
+                                                    {displaySections.structuredContent && (
+                                                        <div className="pmcp-tool-result">
+                                                            <span className="pmcp-tool-result-label">structured:</span>
+                                                            <pre>{formatToolResult(displaySections.structuredContent)}</pre>
+                                                        </div>
+                                                    )}
+                                                    {displaySections.showRawPayload && (
+                                                        <div className="pmcp-tool-result">
+                                                            <span className="pmcp-tool-result-label">result:</span>
+                                                            <pre>{formatToolResult(displaySections.rawPayload)}</pre>
+                                                        </div>
+                                                    )}
                                                 </>
                                             )}
                                         </div>
@@ -733,14 +741,17 @@ const ChatWidget = () => {
                                 className="pmcp-input"
                                 value={inputText}
                                 onChange={e => setInputText(e.target.value)}
+                                onKeyDownCapture={stopChatInputEventPropagation}
                                 onKeyDown={e => {
                                     if (e.key === 'Enter' && !e.shiftKey) {
                                         e.preventDefault();
                                         handleSend();
                                     }
-                                    stopPageShortcutPropagation(e);
                                 }}
-                                onKeyUp={stopPageShortcutPropagation}
+                                onKeyPressCapture={stopChatInputEventPropagation}
+                                onKeyUpCapture={stopChatInputEventPropagation}
+                                onBeforeInputCapture={stopChatInputEventPropagation as any}
+                                onInputCapture={stopChatInputEventPropagation as any}
                                 placeholder={t('typeMessage') || 'Type a message...'}
                                 disabled={isLoading}
                             />

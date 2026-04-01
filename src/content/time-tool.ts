@@ -1,9 +1,15 @@
 export type CurrentTimeResult = {
-    iso: string;
-    localDateTime: string;
-    timeZone: string;
-    utcOffset: string;
-    today: string;
+    content: Array<{
+        type: 'text';
+        text: string;
+    }>;
+    structuredContent: {
+        iso: string;
+        localDateTime: string;
+        timeZone: string;
+        utcOffset: string;
+        today: string;
+    };
 };
 
 function pad(value: number): string {
@@ -36,11 +42,18 @@ export async function getCurrentTime(): Promise<CurrentTimeResult> {
     const now = new Date();
     const { localDateTime, today } = formatLocalDateTimeParts(now);
     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    const utcOffset = formatUtcOffset(now);
     return {
-        iso: now.toISOString(),
-        localDateTime,
-        timeZone,
-        utcOffset: formatUtcOffset(now),
-        today,
+        content: [{
+            type: 'text',
+            text: `Current local time: ${localDateTime} (${timeZone}, ${utcOffset}). Today is ${today}.`,
+        }],
+        structuredContent: {
+            iso: now.toISOString(),
+            localDateTime,
+            timeZone,
+            utcOffset,
+            today,
+        },
     };
 }
