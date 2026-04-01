@@ -213,6 +213,81 @@ describe('runMcpConversationTurn', () => {
         expect(persisted.at(-1)?.at(-1)?.content).toBe('Done.');
     });
 
+    it('serializes MCP tool results into structured model-facing tool content', async () => {
+        const streamCalls: any[] = [];
+
+        await runMcpConversationTurn({
+            conversationMessages: [
+                { id: 'user-1', role: 'user', content: 'read products', timestamp: 1 },
+            ],
+            buildExecutableTools: () => [{
+                openAiName: 'read_products',
+                displayName: 'read_products',
+                description: 'Read products',
+                parameters: { type: 'object', properties: {} },
+                execute: async () => ({
+                    content: [{ type: 'text', text: 'Found 2 products' }],
+                    structuredContent: { products: [{ id: 1 }, { id: 2 }] },
+                }),
+            } as any],
+            toOpenAiMessages: () => [{ role: 'user', content: 'read products' }],
+            buildOpenAiTools: () => [{
+                type: 'function' as const,
+                function: {
+                    name: 'read_products',
+                    description: 'Read products',
+                    parameters: { type: 'object', properties: {} },
+                },
+            }],
+            formatToolResult: (result) => JSON.stringify(result ?? null),
+            callCompletions: vi.fn(async () => ({ choices: [] })),
+            streamCompletion: vi
+                .fn()
+                .mockImplementationOnce(async (messages, onEvent) => {
+                    streamCalls.push(messages);
+                    onEvent({
+                        type: 'tool-call-delta',
+                        toolCalls: [{
+                            index: 0,
+                            id: 'call_1',
+                            type: 'function',
+                            function: { name: 'read_products', arguments: '{}' },
+                        }],
+                    });
+                })
+                .mockImplementationOnce(async (messages, onEvent) => {
+                    streamCalls.push(messages);
+                    onEvent({ type: 'text-delta', delta: 'done' });
+                }),
+            persistConversation: async () => {},
+            updateConversation: () => {},
+        });
+
+        const secondRoundToolMessage = streamCalls[1].find((message: any) => message.role === 'tool');
+        expect(secondRoundToolMessage).toEqual({
+            role: 'tool',
+            tool_call_id: 'call_1',
+            content: [
+                'Tool succeeded.',
+                '',
+                'Summary:',
+                'Found 2 products',
+                '',
+                'Structured result:',
+                '{',
+                '  "products": [',
+                '    {',
+                '      "id": 1',
+                '    },',
+                '    {',
+                '      "id": 2',
+                '    }',
+                '  ]',
+                '}',
+            ].join('\n'),
+        });
+    });
+
     it('persists a visible assistant error message when the turn fails', async () => {
         const persisted: ChatMessage[][] = [];
 
@@ -300,7 +375,7 @@ describe('runMcpConversationTurn', () => {
         expect(toolMessage?.toolCalls?.[0]?.error).toBe('User canceled');
     });
 
-    it('stops the turn after a tool execution failure instead of requesting another round', async () => {
+    it('continues to another round after a thrown tool execution failure', async () => {
         const updates: ChatMessage[][] = [];
         const persisted: ChatMessage[][] = [];
         const execute = vi.fn(async () => {
@@ -322,6 +397,9 @@ describe('runMcpConversationTurn', () => {
                         },
                     }],
                 });
+            })
+            .mockImplementationOnce(async (_messages, onEvent) => {
+                onEvent({ type: 'text-delta', delta: 'The tool failed, so I could not complete that action.' });
             });
 
         await runMcpConversationTurn({
@@ -355,11 +433,12 @@ describe('runMcpConversationTurn', () => {
             },
         });
 
-        expect(streamCompletion).toHaveBeenCalledTimes(1);
+        expect(streamCompletion).toHaveBeenCalledTimes(2);
         const toolMessage = updates.flat().find((message) => message.role === 'tool');
         expect(toolMessage?.toolCalls?.[0]?.status).toBe('error');
         expect(toolMessage?.toolCalls?.[0]?.error).toBe('tool failed');
         expect(persisted.at(-1)?.some((message) => message.role === 'tool' && message.toolCalls?.[0]?.error === 'tool failed')).toBe(true);
+        expect(persisted.at(-1)?.at(-1)?.content).toBe('The tool failed, so I could not complete that action.');
     });
 
     it('treats MCP isError tool results as failed tool cards', async () => {
@@ -425,6 +504,66 @@ describe('runMcpConversationTurn', () => {
             content: [{ type: 'text', text: 'API rate limit exceeded' }],
             isError: true,
         });
+        expect(persisted.at(-1)?.some((message) => message.role === 'tool' && message.toolCalls?.[0]?.status === 'error')).toBe(true);
+    });
+
+    it('continues the turn after a tool error so the assistant can respond to the failure', async () => {
+        const persisted: ChatMessage[][] = [];
+        const streamCompletion = vi
+            .fn()
+            .mockImplementationOnce(async (_messages, onEvent) => {
+                onEvent({
+                    type: 'tool-call-delta',
+                    toolCalls: [{
+                        index: 0,
+                        id: 'call_1',
+                        type: 'function',
+                        function: {
+                            name: 'read_title',
+                            arguments: '{}',
+                        },
+                    }],
+                });
+            })
+            .mockImplementationOnce(async (_messages, onEvent) => {
+                onEvent({ type: 'text-delta', delta: 'I could not read the title because the selector failed.' });
+            });
+
+        await runMcpConversationTurn({
+            conversationMessages: [
+                { id: 'user-1', role: 'user', content: 'read title', timestamp: 1 },
+            ],
+            buildExecutableTools: () => [{
+                openAiName: 'read_title',
+                displayName: 'read_title',
+                description: 'Read title',
+                parameters: { type: 'object', properties: {} },
+                execute: async () => ({
+                    content: [{ type: 'text', text: 'selector missing' }],
+                    isError: true,
+                }),
+            } as any],
+            toOpenAiMessages: () => [{ role: 'user', content: 'read title' }],
+            buildOpenAiTools: () => [{
+                type: 'function' as const,
+                function: {
+                    name: 'read_title',
+                    description: 'Read title',
+                    parameters: { type: 'object', properties: {} },
+                },
+            }],
+            formatToolResult: (result) => JSON.stringify(result ?? null),
+            callCompletions: vi.fn(async () => ({ choices: [] })),
+            streamCompletion,
+            persistConversation: async (messages) => {
+                persisted.push(messages);
+            },
+            updateConversation: () => {},
+        });
+
+        expect(streamCompletion).toHaveBeenCalledTimes(2);
+        expect(persisted.at(-1)?.at(-1)?.role).toBe('assistant');
+        expect(persisted.at(-1)?.at(-1)?.content).toBe('I could not read the title because the selector failed.');
         expect(persisted.at(-1)?.some((message) => message.role === 'tool' && message.toolCalls?.[0]?.status === 'error')).toBe(true);
     });
 });

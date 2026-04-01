@@ -672,6 +672,12 @@ h4.pmcp-heading, .pmcp-bubble h4 { font-size: 14px; }
     word-break: break-all;
     font-family: inherit;
 }
+.pmcp-tool-result-text {
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: inherit;
+    color: var(--pmcp-text);
+}
 
 /* ---- Loading ---- */
 .pmcp-loading {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeToolExecutionResult } from './tool-result-normalizer.js';
+import { normalizeToolExecutionResult, serializeToolResultForModel } from './tool-result-normalizer.js';
 
 describe('normalizeToolExecutionResult', () => {
     it('keeps ordinary tool results as successful results', () => {
@@ -8,7 +8,7 @@ describe('normalizeToolExecutionResult', () => {
         ).toEqual({
             status: 'success',
             error: undefined,
-            modelContent: JSON.stringify({ content: [{ type: 'text', text: 'ok' }] }),
+            modelContent: 'Tool succeeded.\n\nSummary:\nok',
             result: { content: [{ type: 'text', text: 'ok' }] },
         });
     });
@@ -26,8 +26,79 @@ describe('normalizeToolExecutionResult', () => {
         ).toEqual({
             status: 'error',
             error: 'API rate limit exceeded',
-            modelContent: JSON.stringify(rawResult),
+            modelContent: 'Tool failed.\n\nError:\nAPI rate limit exceeded',
             result: rawResult,
         });
+    });
+
+    it('serializes structured MCP success results for the model with summary and JSON', () => {
+        expect(
+            serializeToolResultForModel(
+                {
+                    content: [{ type: 'text', text: 'Found 2 products' }],
+                    structuredContent: { products: [{ id: 1 }, { id: 2 }] },
+                },
+                (result) => JSON.stringify(result),
+            ),
+        ).toBe([
+            'Tool succeeded.',
+            '',
+            'Summary:',
+            'Found 2 products',
+            '',
+            'Structured result:',
+            '{',
+            '  "products": [',
+            '    {',
+            '      "id": 1',
+            '    },',
+            '    {',
+            '      "id": 2',
+            '    }',
+            '  ]',
+            '}',
+        ].join('\n'));
+    });
+
+    it('serializes MCP error results for the model with error text and structured details', () => {
+        expect(
+            serializeToolResultForModel(
+                {
+                    content: [{ type: 'text', text: 'API rate limit exceeded' }],
+                    structuredContent: { retryAfter: 30 },
+                    isError: true,
+                },
+                (result) => JSON.stringify(result),
+            ),
+        ).toBe([
+            'Tool failed.',
+            '',
+            'Error:',
+            'API rate limit exceeded',
+            '',
+            'Structured result:',
+            '{',
+            '  "retryAfter": 30',
+            '}',
+        ].join('\n'));
+    });
+
+    it('preserves non-retryable guidance for timeout-style tool errors', () => {
+        expect(
+            serializeToolResultForModel(
+                {
+                    content: [{
+                        type: 'text',
+                        text: 'Remote tool execution timeout after 30000ms. Do not retry this tool call with the same arguments unless the environment changes.',
+                    }],
+                    structuredContent: {
+                        errorCode: 'timeout',
+                        retryRecommended: false,
+                    },
+                    isError: true,
+                },
+                (result) => JSON.stringify(result),
+            ),
+        ).toContain('Do not retry this tool call with the same arguments');
     });
 });

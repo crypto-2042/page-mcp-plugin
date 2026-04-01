@@ -213,10 +213,6 @@ export async function runMcpConversationTurn(params: {
                 params.updateConversation(messages);
             }
 
-            if (toolMessages.some((message) => message.toolCalls?.some((call) => call.status === 'error'))) {
-                await params.persistConversation(messages);
-                return messages;
-            }
         }
 
         throw new Error(`Tool-call rounds exceeded limit (${maxToolRounds})`);
