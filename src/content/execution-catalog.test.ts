@@ -43,6 +43,25 @@ describe('buildExecutionCatalog', () => {
         expect(callTool).toHaveBeenCalledWith('native-tool', {});
     });
 
+    it('normalizes native tool execution throws into MCP error results', async () => {
+        const callTool = vi.fn(async () => {
+            throw new Error('native exploded');
+        });
+
+        const catalog = buildExecutionCatalog({
+            mcpClient: { callTool } as any,
+            tools: [
+                { name: 'native-tool', description: 'Native tool', sourceType: 'native', sourceLabel: 'native' },
+            ] as any,
+        });
+
+        const nativeTool = catalog.find((item) => item.displayName === 'native-tool');
+        await expect(nativeTool!.execute({})).resolves.toEqual({
+            content: [{ type: 'text', text: 'native exploded' }],
+            isError: true,
+        });
+    });
+
     it('executes remote tools via page MAIN world bridge', async () => {
         const callTool = vi.fn(async () => ({ ok: true }));
         const executeStr = '(args) => { return document.title; }';
@@ -71,6 +90,31 @@ describe('buildExecutionCatalog', () => {
         expect(executeRemoteToolInPage).toHaveBeenCalledWith(executeStr, { arg1: 'value1' });
         expect(remoteTool!.sourceType).toBe('remote');
         expect(remoteTool!.sourceRepositoryId).toBe('repo-1');
+    });
+
+    it('normalizes remote tool execution throws into MCP error results', async () => {
+        vi.mocked(executeRemoteToolInPage).mockRejectedValueOnce(new Error('remote exploded'));
+        const executeStr = '(args) => { return document.title; }';
+
+        const catalog = buildExecutionCatalog({
+            mcpClient: { callTool: vi.fn() } as any,
+            tools: [
+                {
+                    name: 'remote-tool',
+                    description: 'Remote tool',
+                    sourceType: 'remote',
+                    sourceLabel: 'remote:x',
+                    sourceRepositoryId: 'repo-1',
+                    execute: executeStr,
+                },
+            ] as any,
+        });
+
+        const remoteTool = catalog.find((item) => item.displayName === 'remote-tool');
+        await expect(remoteTool!.execute({ arg1: 'value1' })).resolves.toEqual({
+            content: [{ type: 'text', text: 'remote exploded' }],
+            isError: true,
+        });
     });
 
     it('skips remote tools without execute string', () => {

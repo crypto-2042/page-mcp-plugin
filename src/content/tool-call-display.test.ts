@@ -21,4 +21,21 @@ describe('getToolCallResultPayload', () => {
             error: 'selector missing',
         })).toEqual({ error: 'selector missing' });
     });
+
+    it('prefers the normalized error result payload when available', () => {
+        expect(getToolCallResultPayload({
+            id: 'call_1',
+            name: 'read_page',
+            args: { selector: 'title' },
+            status: 'error',
+            error: 'selector missing',
+            result: {
+                content: [{ type: 'text', text: 'selector missing' }],
+                isError: true,
+            },
+        })).toEqual({
+            content: [{ type: 'text', text: 'selector missing' }],
+            isError: true,
+        });
+    });
 });

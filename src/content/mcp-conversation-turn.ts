@@ -8,6 +8,7 @@ import type {
     OpenAIStreamEvent,
 } from './mcp-openai.js';
 import { accumulateToolCallDeltas } from './chat-stream.js';
+import { normalizeToolExecutionResult } from './tool-result-normalizer.js';
 import { buildTimeSensitivitySystemMessage } from './time-instruction.js';
 
 function createToolMessage(params: {
@@ -30,7 +31,9 @@ function createToolMessage(params: {
             name: params.displayName || params.toolName,
             args: params.args,
             status: params.status,
-            ...(params.status === 'error' ? { error: params.error } : { result: params.result }),
+            ...(params.status === 'error'
+                ? { error: params.error, ...(params.result !== undefined ? { result: params.result } : {}) }
+                : { result: params.result }),
         }],
     };
 }
@@ -158,20 +161,35 @@ export async function runMcpConversationTurn(params: {
                     }
 
                     const result = await executable.execute(args);
-                    const toolResultText = params.formatToolResult(result, executable.outputSchema);
+                    const normalizedResult = normalizeToolExecutionResult(
+                        result,
+                        (rawResult) => params.formatToolResult(rawResult, executable.outputSchema),
+                    );
                     workingMessages.push({
                         role: 'tool',
                         tool_call_id: toolCallId,
-                        content: toolResultText,
+                        content: normalizedResult.modelContent,
                     });
-                    toolMessages.push(createToolMessage({
-                        toolCallId,
-                        toolName: call.function.name,
-                        displayName: executable.displayName,
-                        args,
-                        status: 'success',
-                        result,
-                    }));
+                    toolMessages.push(
+                        normalizedResult.status === 'error'
+                            ? createToolMessage({
+                                toolCallId,
+                                toolName: call.function.name,
+                                displayName: executable.displayName,
+                                args,
+                                status: 'error',
+                                error: normalizedResult.error,
+                                result: normalizedResult.result,
+                            })
+                            : createToolMessage({
+                                toolCallId,
+                                toolName: call.function.name,
+                                displayName: executable.displayName,
+                                args,
+                                status: 'success',
+                                result: normalizedResult.result,
+                            }),
+                    );
                 } catch (toolError) {
                     const errorText = (toolError as Error)?.message || String(toolError);
                     workingMessages.push({

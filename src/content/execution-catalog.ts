@@ -4,6 +4,7 @@ import type {
 } from '@page-mcp/protocol';
 import { executeRemoteToolInPage } from './remote-tool-executor.js';
 import { getCurrentTime } from './time-tool.js';
+import { buildMcpToolErrorResult } from './tool-result-normalizer.js';
 
 type SourceTagged = {
     sourceType: 'native' | 'remote';
@@ -88,7 +89,13 @@ export function buildExecutionCatalog(params: {
             required: ['iso', 'localDateTime', 'timeZone', 'utcOffset', 'today'],
             additionalProperties: false,
         },
-        execute: async () => getCurrentTime(),
+        execute: async () => {
+            try {
+                return await getCurrentTime();
+            } catch (error) {
+                return buildMcpToolErrorResult(error);
+            }
+        },
         sourceType: 'native',
         sourceLabel: 'builtin',
     });
@@ -107,7 +114,13 @@ export function buildExecutionCatalog(params: {
                 description: tool.description || tool.name,
                 parameters: (tool.inputSchema as unknown as Record<string, unknown>) || { type: 'object', properties: {} },
                 outputSchema: tool.outputSchema ?? tool.manifest?.outputSchema,
-                execute: (args) => executeRemoteToolInPage(executeStr, args),
+                execute: async (args) => {
+                    try {
+                        return await executeRemoteToolInPage(executeStr, args);
+                    } catch (error) {
+                        return buildMcpToolErrorResult(error);
+                    }
+                },
                 sourceType: tool.sourceType,
                 sourceLabel: tool.sourceLabel,
                 sourceRepositoryId: tool.sourceRepositoryId,
@@ -120,7 +133,13 @@ export function buildExecutionCatalog(params: {
                 description: tool.description || tool.name,
                 parameters: (tool.inputSchema as unknown as Record<string, unknown>) || { type: 'object', properties: {} },
                 outputSchema: tool.outputSchema ?? tool.manifest?.outputSchema,
-                execute: (args) => params.mcpClient!.callTool(tool.name, args),
+                execute: async (args) => {
+                    try {
+                        return await params.mcpClient!.callTool(tool.name, args);
+                    } catch (error) {
+                        return buildMcpToolErrorResult(error);
+                    }
+                },
                 sourceType: tool.sourceType,
                 sourceLabel: tool.sourceLabel,
                 sourceRepositoryId: tool.sourceRepositoryId,
