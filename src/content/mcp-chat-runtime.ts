@@ -23,7 +23,9 @@ export function createMcpChatRuntime(params: {
     buildExecutionCatalog: (params: {
         mcpClient: Pick<PageMcpClient, 'callTool'> | null;
         tools: Array<AnthropicMcpTool & SourceTagged>;
+        remoteToolTimeoutMs?: number;
     }) => ExecutableTool[];
+    remoteToolTimeoutMs?: number;
     buildOpenAiToolsFromCatalog: (tools: ExecutableTool[]) => OpenAiToolDefinition[];
     toOpenAiMessages: (messages: ChatMessage[]) => OpenAIChatMessage[];
     formatToolResult: (result: unknown, outputSchema?: unknown) => string;
@@ -45,6 +47,7 @@ export function createMcpChatRuntime(params: {
             const executableTools = params.buildExecutionCatalog({
                 mcpClient: params.mcpClient,
                 tools: params.tools,
+                remoteToolTimeoutMs: params.remoteToolTimeoutMs,
             });
 
             return runConversation({

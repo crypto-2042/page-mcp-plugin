@@ -68,6 +68,7 @@ function createUniqueToolName(base: string, used: Set<string>): string {
 export function buildExecutionCatalog(params: {
     mcpClient: Pick<PageMcpClient, 'callTool'> | null;
     tools: ToolLike[];
+    remoteToolTimeoutMs?: number;
 }): ExecutableTool[] {
     const executableTools: ExecutableTool[] = [];
     const usedToolNames = new Set<string>();
@@ -116,6 +117,9 @@ export function buildExecutionCatalog(params: {
                 outputSchema: tool.outputSchema ?? tool.manifest?.outputSchema,
                 execute: async (args) => {
                     try {
+                        if (typeof params.remoteToolTimeoutMs === 'number') {
+                            return await executeRemoteToolInPage(executeStr, args, params.remoteToolTimeoutMs);
+                        }
                         return await executeRemoteToolInPage(executeStr, args);
                     } catch (error) {
                         return buildMcpToolErrorResult(error);

@@ -16,26 +16,45 @@ function createToolMessage(params: {
     toolName: string;
     displayName: string;
     args: Record<string, unknown>;
-    status: 'success' | 'error';
+    status: 'pending' | 'success' | 'error';
+    startedAt?: number;
+    finishedAt?: number;
+    durationMs?: number;
     result?: unknown;
     error?: string;
 }): ChatMessage {
     return {
         id: generateMessageId(),
         role: 'tool',
-        content: params.status === 'error' ? (params.error || '') : JSON.stringify(params.result ?? null),
-        timestamp: Date.now(),
+        content:
+            params.status === 'pending'
+                ? ''
+                : params.status === 'error'
+                    ? (params.error || '')
+                    : JSON.stringify(params.result ?? null),
+        timestamp: params.startedAt ?? params.finishedAt ?? Date.now(),
         toolCallId: params.toolCallId,
         toolCalls: [{
             id: params.toolCallId,
             name: params.displayName || params.toolName,
             args: params.args,
             status: params.status,
+            ...(params.startedAt !== undefined ? { startedAt: params.startedAt } : {}),
+            ...(params.finishedAt !== undefined ? { finishedAt: params.finishedAt } : {}),
+            ...(params.durationMs !== undefined ? { durationMs: params.durationMs } : {}),
             ...(params.status === 'error'
                 ? { error: params.error, ...(params.result !== undefined ? { result: params.result } : {}) }
-                : { result: params.result }),
+                : params.status === 'success'
+                    ? { result: params.result }
+                    : {}),
         }],
     };
+}
+
+function replaceToolMessage(messages: ChatMessage[], nextMessage: ChatMessage): ChatMessage[] {
+    return messages.map((message) => (
+        message.toolCallId === nextMessage.toolCallId ? nextMessage : message
+    ));
 }
 
 export async function runMcpConversationTurn(params: {
@@ -108,10 +127,10 @@ export async function runMcpConversationTurn(params: {
                 tool_calls: toolCalls,
             });
 
-            const toolMessages: ChatMessage[] = [];
             for (const call of toolCalls) {
                 if (call?.type !== 'function' || !call.function?.name) continue;
                 const toolCallId = call.id || generateToolCallId();
+                const startedAt = Date.now();
                 let args: Record<string, unknown> = {};
                 try {
                     args = call.function.arguments ? JSON.parse(call.function.arguments) : {};
@@ -121,46 +140,70 @@ export async function runMcpConversationTurn(params: {
 
                 const executable = toolIndex.get(call.function.name);
                 if (!executable) {
+                    const finishedAt = Date.now();
                     const errorText = `Tool not found: ${call.function.name}`;
                     workingMessages.push({
                         role: 'tool',
                         tool_call_id: toolCallId,
                         content: JSON.stringify({ error: errorText }),
                     });
-                    toolMessages.push(createToolMessage({
+                    const missingToolMessage = createToolMessage({
                         toolCallId,
                         toolName: call.function.name,
                         displayName: call.function.name,
                         args,
                         status: 'error',
+                        startedAt,
+                        finishedAt,
+                        durationMs: Math.max(0, finishedAt - startedAt),
                         error: errorText,
-                    }));
+                    });
+                    messages = [...messages, missingToolMessage];
+                    params.updateConversation(messages);
                     continue;
                 }
+
+                const pendingToolMessage = createToolMessage({
+                    toolCallId,
+                    toolName: call.function.name,
+                    displayName: executable.displayName,
+                    args,
+                    status: 'pending',
+                    startedAt,
+                });
+                messages = [...messages, pendingToolMessage];
+                params.updateConversation(messages);
 
                 try {
                     if (executable.sourceType === 'remote' && params.confirmRemoteTool) {
                         const allowed = await params.confirmRemoteTool(executable, args);
                         if (!allowed) {
+                            const finishedAt = Date.now();
                             const errorText = 'User canceled';
                             workingMessages.push({
                                 role: 'tool',
                                 tool_call_id: toolCallId,
                                 content: JSON.stringify({ error: errorText }),
                             });
-                            toolMessages.push(createToolMessage({
+                            const canceledToolMessage = createToolMessage({
                                 toolCallId,
                                 toolName: call.function.name,
                                 displayName: executable.displayName,
                                 args,
                                 status: 'error',
+                                startedAt,
+                                finishedAt,
+                                durationMs: Math.max(0, finishedAt - startedAt),
                                 error: errorText,
-                            }));
+                            });
+                            messages = replaceToolMessage(messages, canceledToolMessage);
+                            params.updateConversation(messages);
                             continue;
                         }
                     }
 
                     const result = await executable.execute(args);
+                    const finishedAt = Date.now();
                     const normalizedResult = normalizeToolExecutionResult(
                         result,
                         (rawResult) => params.formatToolResult(rawResult, executable.outputSchema),
@@ -170,7 +213,7 @@ export async function runMcpConversationTurn(params: {
                         tool_call_id: toolCallId,
                         content: normalizedResult.modelContent,
                     });
-                    toolMessages.push(
+                    const completedToolMessage =
                         normalizedResult.status === 'error'
                             ? createToolMessage({
                                 toolCallId,
@@ -178,6 +221,9 @@ export async function runMcpConversationTurn(params: {
                                 displayName: executable.displayName,
                                 args,
                                 status: 'error',
+                                startedAt,
+                                finishedAt,
+                                durationMs: Math.max(0, finishedAt - startedAt),
                                 error: normalizedResult.error,
                                 result: normalizedResult.result,
                             })
@@ -187,30 +233,35 @@ export async function runMcpConversationTurn(params: {
                                 displayName: executable.displayName,
                                 args,
                                 status: 'success',
+                                startedAt,
+                                finishedAt,
+                                durationMs: Math.max(0, finishedAt - startedAt),
                                 result: normalizedResult.result,
-                            }),
-                    );
+                            });
+                    messages = replaceToolMessage(messages, completedToolMessage);
+                    params.updateConversation(messages);
                 } catch (toolError) {
+                    const finishedAt = Date.now();
                     const errorText = (toolError as Error)?.message || String(toolError);
                     workingMessages.push({
                         role: 'tool',
                         tool_call_id: toolCallId,
                         content: JSON.stringify({ error: errorText }),
                     });
-                    toolMessages.push(createToolMessage({
+                    const failedToolMessage = createToolMessage({
                         toolCallId,
                         toolName: call.function.name,
                         displayName: executable.displayName,
                         args,
                         status: 'error',
+                        startedAt,
+                        finishedAt,
+                        durationMs: Math.max(0, finishedAt - startedAt),
                         error: errorText,
-                    }));
+                    });
+                    messages = replaceToolMessage(messages, failedToolMessage);
+                    params.updateConversation(messages);
                 }
-            }
-
-            if (toolMessages.length > 0) {
-                messages = [...messages, ...toolMessages];
-                params.updateConversation(messages);
             }
 
         }

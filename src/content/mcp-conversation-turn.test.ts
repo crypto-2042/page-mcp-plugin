@@ -2,6 +2,10 @@ import { describe, expect, it, vi } from 'vitest';
 import type { ChatMessage } from '../shared/types.js';
 import { runMcpConversationTurn } from './mcp-conversation-turn.js';
 
+function getLastToolMessage(messages: ChatMessage[][]): ChatMessage | undefined {
+    return [...messages.flat()].reverse().find((message) => message.role === 'tool');
+}
+
 describe('runMcpConversationTurn', () => {
     it('streams a final assistant response when no tool calls are requested', async () => {
         const updates: ChatMessage[][] = [];
@@ -91,9 +95,96 @@ describe('runMcpConversationTurn', () => {
             },
         });
 
-        const toolMessage = updates.flat().find((message) => message.role === 'tool');
+        const toolMessage = getLastToolMessage(updates);
         expect(toolMessage?.toolCalls?.[0]?.name).toBe('read_title');
         expect(toolMessage?.toolCalls?.[0]?.result).toEqual({ title: 'Hello' });
+    });
+
+    it('shows a pending tool card before execution completes and then records duration', async () => {
+        const updates: ChatMessage[][] = [];
+        let releaseTool: ((value: { title: string }) => void) | undefined;
+        const execute = vi.fn(() => new Promise((resolve) => {
+            releaseTool = resolve as (value: { title: string }) => void;
+        }));
+        const nowSpy = vi.spyOn(Date, 'now');
+        nowSpy
+            .mockReturnValueOnce(1000)
+            .mockReturnValueOnce(1000)
+            .mockReturnValueOnce(1450)
+            .mockReturnValueOnce(1450);
+
+        const turnPromise = runMcpConversationTurn({
+            conversationMessages: [
+                { id: 'user-1', role: 'user', content: 'read title', timestamp: 1 },
+            ],
+            buildExecutableTools: () => [{
+                openAiName: 'read_title',
+                displayName: 'read_title',
+                description: 'Read title',
+                parameters: { type: 'object', properties: {} },
+                execute,
+            } as any],
+            toOpenAiMessages: () => [{ role: 'user', content: 'read title' }],
+            buildOpenAiTools: () => [{
+                type: 'function' as const,
+                function: {
+                    name: 'read_title',
+                    description: 'Read title',
+                    parameters: { type: 'object', properties: {} },
+                },
+            }],
+            formatToolResult: (result) => JSON.stringify(result ?? null),
+            callCompletions: vi.fn(async () => ({ choices: [] })),
+            streamCompletion: vi
+                .fn()
+                .mockImplementationOnce(async (_messages, onEvent) => {
+                    onEvent({
+                        type: 'tool-call-delta',
+                        toolCalls: [{
+                            index: 0,
+                            id: 'call_1',
+                            type: 'function',
+                            function: {
+                                name: 'read_title',
+                                arguments: '{}',
+                            },
+                        }],
+                    });
+                })
+                .mockImplementationOnce(async (_messages, onEvent) => {
+                    onEvent({ type: 'text-delta', delta: 'done' });
+                }),
+            persistConversation: async () => {},
+            updateConversation: (messages) => {
+                updates.push(messages);
+            },
+        });
+
+        await Promise.resolve();
+
+        const pendingToolMessage = updates.at(-1)?.find((message) => message.role === 'tool');
+        expect(pendingToolMessage?.toolCalls?.[0]).toEqual(expect.objectContaining({
+            id: 'call_1',
+            name: 'read_title',
+            status: 'pending',
+            startedAt: 1000,
+        }));
+
+        releaseTool?.({ title: 'Hello' });
+        await turnPromise;
+
+        const completedToolMessage = getLastToolMessage(updates);
+        expect(completedToolMessage?.toolCalls?.[0]).toEqual(expect.objectContaining({
+            id: 'call_1',
+            name: 'read_title',
+            status: 'success',
+            startedAt: 1000,
+            finishedAt: 1450,
+            durationMs: 450,
+            result: { title: 'Hello' },
+        }));
+
+        nowSpy.mockRestore();
     });
 
     it('preserves assistant text that appears before a tool call', async () => {
@@ -209,7 +300,7 @@ describe('runMcpConversationTurn', () => {
 
         expect(streamCompletion).toHaveBeenCalledTimes(2);
         expect(execute).toHaveBeenCalledWith({});
-        expect(updates.flat().find((message) => message.role === 'tool')?.toolCalls?.[0]?.result).toEqual({ title: 'Hello' });
+        expect(getLastToolMessage(updates)?.toolCalls?.[0]?.result).toEqual({ title: 'Hello' });
         expect(persisted.at(-1)?.at(-1)?.content).toBe('Done.');
     });
 
@@ -370,7 +461,7 @@ describe('runMcpConversationTurn', () => {
 
         expect(confirmRemoteTool).toHaveBeenCalled();
         expect(execute).not.toHaveBeenCalled();
-        const toolMessage = updates.flat().find((message) => message.role === 'tool');
+        const toolMessage = getLastToolMessage(updates);
         expect(toolMessage?.toolCalls?.[0]?.status).toBe('error');
         expect(toolMessage?.toolCalls?.[0]?.error).toBe('User canceled');
     });
@@ -434,7 +525,7 @@ describe('runMcpConversationTurn', () => {
         });
 
         expect(streamCompletion).toHaveBeenCalledTimes(2);
-        const toolMessage = updates.flat().find((message) => message.role === 'tool');
+        const toolMessage = getLastToolMessage(updates);
         expect(toolMessage?.toolCalls?.[0]?.status).toBe('error');
         expect(toolMessage?.toolCalls?.[0]?.error).toBe('tool failed');
         expect(persisted.at(-1)?.some((message) => message.role === 'tool' && message.toolCalls?.[0]?.error === 'tool failed')).toBe(true);
@@ -497,7 +588,7 @@ describe('runMcpConversationTurn', () => {
             },
         });
 
-        const toolMessage = updates.flat().find((message) => message.role === 'tool');
+        const toolMessage = getLastToolMessage(updates);
         expect(toolMessage?.toolCalls?.[0]?.status).toBe('error');
         expect(toolMessage?.toolCalls?.[0]?.error).toBe('API rate limit exceeded');
         expect(toolMessage?.toolCalls?.[0]?.result).toEqual({

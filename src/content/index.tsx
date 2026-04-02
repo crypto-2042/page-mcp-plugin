@@ -28,7 +28,7 @@ import {
     type OpenAIStreamEvent,
 } from './mcp-openai.js';
 import { filterRenderableMessages } from './chat-message-visibility.js';
-import { getToolCallDisplaySections } from './tool-call-display.js';
+import { formatToolCallDuration, getToolCallDisplaySections, getToolCallHeaderClassNames, getToolCallStatusLabel } from './tool-call-display.js';
 import { createMcpChatRuntime } from './mcp-chat-runtime.js';
 import { runChatAction } from './mcp-chat-actions.js';
 import { safeRuntimeMessage } from './safe-runtime.js';
@@ -316,6 +316,7 @@ const ChatWidget = () => {
         mcpClient,
         tools: tools as Array<WithSource<ToolInfo>>,
         buildExecutionCatalog,
+        remoteToolTimeoutMs: settings.remoteToolTimeoutSeconds * 1000,
         buildOpenAiToolsFromCatalog,
         toOpenAiMessages: (msgs) => toOpenAiConversationMessages(msgs) as OpenAIChatMessage[],
         formatToolResult,
@@ -336,6 +337,7 @@ const ChatWidget = () => {
 
     const runSelectionQuotePreparedTurn = async (params: {
         buildBaseMessages: () => Promise<ChatMessage[]>;
+        createFreshConversation?: boolean;
     }) => {
         const selectionQuoteState = {
             draftQuote,
@@ -389,6 +391,7 @@ const ChatWidget = () => {
                 return { ...conversation, messages: stripSelectionQuoteMessages(messages) };
             },
             persistConversation: persistConv,
+            createFreshConversation: params.createFreshConversation,
         });
 
         if (shouldClearSelectionQuoteDraft({
@@ -457,6 +460,7 @@ const ChatWidget = () => {
                     });
                     return [...resourceMessages, ...builtMessages];
                 },
+                createFreshConversation: !!activeConv?.messages.length,
             });
             abortControllerRef.current = null;
             return;
@@ -480,6 +484,7 @@ const ChatWidget = () => {
                 });
                 return [...resourceMessages, ...promptMessages];
             },
+            createFreshConversation: !!activeConv?.messages.length,
         });
         abortControllerRef.current = null;
     };
@@ -618,15 +623,20 @@ const ChatWidget = () => {
                                 if (m.role === 'tool' && m.toolCalls?.[0]) {
                                     const call = m.toolCalls[0];
                                     const displaySections = getToolCallDisplaySections(call);
+                                    const durationLabel = formatToolCallDuration(call.durationMs);
+                                    const headerClasses = getToolCallHeaderClassNames();
 
                                     const messageId = m.id || String(i);
                                     const expanded = !!expandedToolDetails[messageId];
                                     return (
                                         <div key={messageId} className="pmcp-tool-card">
                                             <div className="pmcp-tool-header">
-                                                <span className="pmcp-tool-name">{call.name}</span>
-                                                <div className="pmcp-tool-header-right">
-                                                    <span className={`pmcp-tool-status ${call.status}`}>{call.status}</span>
+                                                <span className={headerClasses.name}>{call.name}</span>
+                                                <div className={headerClasses.meta}>
+                                                    {durationLabel && (
+                                                        <span className="pmcp-tool-duration">{durationLabel}</span>
+                                                    )}
+                                                    <span className={`pmcp-tool-status ${call.status}`}>{getToolCallStatusLabel(call.status)}</span>
                                                     <button
                                                         className="pmcp-tool-toggle-icon"
                                                         type="button"
