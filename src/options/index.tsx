@@ -318,7 +318,7 @@ const OptionsApp: React.FC = () => {
                 </nav>
 
                 <div className="sidebar-footer">
-                    <p className="version-text">v1.2.1</p>
+                    <p className="version-text">v1.2.2</p>
                 </div>
             </aside>
 
@@ -1025,7 +1025,7 @@ const OptionsApp: React.FC = () => {
                             <div className="about-grid">
                                 <div className="about-item">
                                     <span className="about-label">{t('aboutVersion') || "版本"}</span>
-                                    <span className="about-value">1.2.1</span>
+                                    <span className="about-value">1.2.2</span>
                                 </div>
                                 <div className="about-item">
                                     <span className="about-label">{t('aboutAuthor') || "作者"}</span>
