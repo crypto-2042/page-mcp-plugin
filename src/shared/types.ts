@@ -102,7 +102,10 @@ export interface ToolCallInfo {
     id: string;
     name: string;
     args: Record<string, unknown>;
-    status: 'calling' | 'success' | 'error';
+    status: 'pending' | 'success' | 'error';
+    startedAt?: number;
+    finishedAt?: number;
+    durationMs?: number;
     result?: unknown;
     error?: string;
 }

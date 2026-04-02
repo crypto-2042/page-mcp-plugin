@@ -102,6 +102,30 @@ describe('buildExecutionCatalog', () => {
         expect(remoteTool!.sourceRepositoryId).toBe('repo-1');
     });
 
+    it('passes configured remote tool timeout to page MAIN world bridge', async () => {
+        const executeStr = '(args) => { return document.title; }';
+
+        const catalog = buildExecutionCatalog({
+            mcpClient: { callTool: vi.fn() } as any,
+            tools: [
+                {
+                    name: 'remote-tool',
+                    description: 'Remote tool',
+                    sourceType: 'remote',
+                    sourceLabel: 'remote:x',
+                    sourceRepositoryId: 'repo-1',
+                    execute: executeStr,
+                },
+            ] as any,
+            remoteToolTimeoutMs: 60000,
+        });
+
+        const remoteTool = catalog.find((item) => item.displayName === 'remote-tool');
+        await remoteTool!.execute({ arg1: 'value1' });
+
+        expect(executeRemoteToolInPage).toHaveBeenCalledWith(executeStr, { arg1: 'value1' }, 60000);
+    });
+
     it('normalizes remote tool execution throws into MCP error results', async () => {
         vi.mocked(executeRemoteToolInPage).mockRejectedValueOnce(new Error('remote exploded'));
         const executeStr = '(args) => { return document.title; }';

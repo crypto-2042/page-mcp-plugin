@@ -1,6 +1,31 @@
 import type { ToolCallInfo } from '../shared/types.js';
 
+export function formatToolCallDuration(durationMs?: number): string | null {
+    if (!Number.isFinite(durationMs) || typeof durationMs !== 'number' || durationMs < 0) {
+        return null;
+    }
+    if (durationMs < 1000) {
+        return `${Math.round(durationMs)}ms`;
+    }
+    return `${(Math.round(durationMs / 100) / 10).toFixed(1)}s`;
+}
+
+export function getToolCallStatusLabel(status: ToolCallInfo['status']): string {
+    if (status === 'error') return 'failed';
+    return status;
+}
+
+export function getToolCallHeaderClassNames(): { name: string; meta: string } {
+    return {
+        name: 'pmcp-tool-name pmcp-tool-name-truncate',
+        meta: 'pmcp-tool-header-right pmcp-tool-header-meta-fixed',
+    };
+}
+
 export function getToolCallResultPayload(call: ToolCallInfo): unknown {
+    if (call.status === 'pending') {
+        return null;
+    }
     if (call.status === 'error') {
         if (call.result !== undefined) {
             return call.result;

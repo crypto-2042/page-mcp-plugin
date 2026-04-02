@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getToolCallDisplaySections, getToolCallResultPayload } from './tool-call-display.js';
+import { formatToolCallDuration, getToolCallDisplaySections, getToolCallHeaderClassNames, getToolCallResultPayload, getToolCallStatusLabel } from './tool-call-display.js';
 
 describe('getToolCallResultPayload', () => {
     it('returns the tool result for successful calls', () => {
@@ -84,6 +84,29 @@ describe('getToolCallResultPayload', () => {
             structuredContent: null,
             rawPayload: { value: 1 },
             showRawPayload: true,
+        });
+    });
+});
+
+describe('tool call display helpers', () => {
+    it('formats duration in milliseconds for short tool calls', () => {
+        expect(formatToolCallDuration(450)).toBe('450ms');
+    });
+
+    it('formats duration in seconds for longer tool calls', () => {
+        expect(formatToolCallDuration(1450)).toBe('1.5s');
+    });
+
+    it('returns the user-facing status labels', () => {
+        expect(getToolCallStatusLabel('pending')).toBe('pending');
+        expect(getToolCallStatusLabel('success')).toBe('success');
+        expect(getToolCallStatusLabel('error')).toBe('failed');
+    });
+
+    it('returns non-shrinking meta classes and truncating name classes for the header layout', () => {
+        expect(getToolCallHeaderClassNames()).toEqual({
+            name: 'pmcp-tool-name pmcp-tool-name-truncate',
+            meta: 'pmcp-tool-header-right pmcp-tool-header-meta-fixed',
         });
     });
 });
