@@ -10,9 +10,10 @@ export async function runChatAction(params: {
     setLoading: (loading: boolean) => void;
     runPreparedTurn: (conversation: Conversation) => Promise<Conversation>;
     persistConversation: (conversation: Conversation) => Promise<void>;
+    createFreshConversation?: boolean;
 }) {
     let conversation = params.activeConversation;
-    if (!conversation) {
+    if (!conversation || params.createFreshConversation) {
         conversation = params.createConversation();
         params.setActiveConversationId(conversation.id);
     }

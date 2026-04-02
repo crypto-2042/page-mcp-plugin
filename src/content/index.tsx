@@ -337,6 +337,7 @@ const ChatWidget = () => {
 
     const runSelectionQuotePreparedTurn = async (params: {
         buildBaseMessages: () => Promise<ChatMessage[]>;
+        createFreshConversation?: boolean;
     }) => {
         const selectionQuoteState = {
             draftQuote,
@@ -390,6 +391,7 @@ const ChatWidget = () => {
                 return { ...conversation, messages: stripSelectionQuoteMessages(messages) };
             },
             persistConversation: persistConv,
+            createFreshConversation: params.createFreshConversation,
         });
 
         if (shouldClearSelectionQuoteDraft({
@@ -458,6 +460,7 @@ const ChatWidget = () => {
                     });
                     return [...resourceMessages, ...builtMessages];
                 },
+                createFreshConversation: !!activeConv?.messages.length,
             });
             abortControllerRef.current = null;
             return;
@@ -481,6 +484,7 @@ const ChatWidget = () => {
                 });
                 return [...resourceMessages, ...promptMessages];
             },
+            createFreshConversation: !!activeConv?.messages.length,
         });
         abortControllerRef.current = null;
     };
