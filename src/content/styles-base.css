@@ -557,8 +557,17 @@
     border-bottom-left-radius: 6px;
 }
 
-.pmcp-bubble a { color: var(--pmcp-accent); text-decoration: none; }
-.pmcp-bubble a:hover { text-decoration: underline; }
+.pmcp-link-like {
+    color: var(--pmcp-accent);
+    text-decoration: underline;
+    cursor: text;
+}
+.pmcp-msg-user .pmcp-link-like {
+    color: inherit;
+}
+.pmcp-msg-assistant .pmcp-link-like {
+    color: var(--pmcp-accent);
+}
 .pmcp-bubble strong { font-weight: 600; }
 
 .pmcp-inline-code, .pmcp-bubble code {
