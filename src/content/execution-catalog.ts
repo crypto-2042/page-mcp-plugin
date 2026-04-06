@@ -36,19 +36,37 @@ type ToolLike = AnthropicMcpTool & SourceTagged & {
  * Names must match ^[a-zA-Z0-9_-]+$ and be at most 64 chars.
  */
 function sanitizeToolName(raw: string): string {
-    return raw.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64);
+    const sanitized = raw.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64);
+    return sanitized || 'tool';
 }
 
 function createUniqueToolName(base: string, used: Set<string>): string {
-    let name = base;
+    const normalizedBase = base || 'tool';
+    let name = normalizedBase;
     let index = 2;
     while (used.has(name)) {
         const suffix = `_${index}`;
-        name = `${base.slice(0, Math.max(1, 64 - suffix.length))}${suffix}`;
+        name = `${normalizedBase.slice(0, Math.max(1, 64 - suffix.length))}${suffix}`;
         index += 1;
     }
     used.add(name);
     return name;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value) && Object.getPrototypeOf(value) === Object.prototype;
+}
+
+function normalizeParametersSchema(value: unknown): Record<string, unknown> {
+    if (isPlainObject(value) && value.type === 'object') {
+        return value;
+    }
+
+    return { type: 'object', properties: {} };
+}
+
+function getToolParametersSchema(tool: ToolLike): Record<string, unknown> {
+    return normalizeParametersSchema(tool.inputSchema ?? tool.manifest?.inputSchema);
 }
 
 /**
@@ -102,6 +120,10 @@ export function buildExecutionCatalog(params: {
     });
 
     for (const tool of params.tools) {
+        if (tool.name === 'init') {
+            continue;
+        }
+
         if (tool.sourceType === 'remote') {
             // Remote tools → execute via MAIN world bridge
             const executeStr = tool.execute;
@@ -113,7 +135,7 @@ export function buildExecutionCatalog(params: {
                 openAiName: createUniqueToolName(sanitizeToolName(tool.name), usedToolNames),
                 displayName: tool.name,
                 description: tool.description || tool.name,
-                parameters: (tool.inputSchema as unknown as Record<string, unknown>) || { type: 'object', properties: {} },
+                parameters: getToolParametersSchema(tool),
                 outputSchema: tool.outputSchema ?? tool.manifest?.outputSchema,
                 execute: async (args) => {
                     try {
@@ -135,7 +157,7 @@ export function buildExecutionCatalog(params: {
                 openAiName: createUniqueToolName(sanitizeToolName(tool.name), usedToolNames),
                 displayName: tool.name,
                 description: tool.description || tool.name,
-                parameters: (tool.inputSchema as unknown as Record<string, unknown>) || { type: 'object', properties: {} },
+                parameters: getToolParametersSchema(tool),
                 outputSchema: tool.outputSchema ?? tool.manifest?.outputSchema,
                 execute: async (args) => {
                     try {

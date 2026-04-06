@@ -13,8 +13,10 @@ import { renderMarkdown } from './markdown.js';
 import { formatToolResult } from './tool-result-format.js';
 import { buildQuickActionCandidates } from './quick-actions.js';
 import { buildExecutionCatalog, type ExecutableTool } from './execution-catalog.js';
+import { createInitRunState, maybeRunInitForPage, type InitTool } from './init-tool.js';
 import { buildAttachedResourceMessages, readLocalResource } from './mcp-resources.js';
 import { applyPromptShortcutMessages } from './mcp-prompt-shortcuts.js';
+import { registerPageShortcutRuntimeListener } from './page-shortcut-runtime.js';
 import {
     getInitialAttachedResourceUris,
     getSelectedResourceCountLabel,
@@ -135,6 +137,9 @@ const ChatWidget = () => {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const qaHovered = useRef(false);
     const abortControllerRef = useRef<AbortController | null>(null);
+    const initRunStateRef = useRef(createInitRunState());
+    const handleSendRef = useRef<(text?: string) => Promise<void>>(async () => {});
+    const handlePromptShortcutRef = useRef<(name: string) => Promise<void>>(async () => {});
     const [pendingToolConfirm, setPendingToolConfirm] = useState<PendingToolConfirm | null>(null);
 
     const handleStop = () => {
@@ -154,6 +159,16 @@ const ChatWidget = () => {
     useEffect(() => {
         setAttachedResourceUris((current) => getInitialAttachedResourceUris(resources, current));
     }, [resources]);
+
+    useEffect(() => {
+        void maybeRunInitForPage({
+            state: initRunStateRef.current,
+            pageKey: `${window.location.origin}${window.location.pathname}`,
+            pathname: window.location.pathname,
+            tools: tools as unknown as InitTool[],
+            timeoutMs: settings.remoteToolTimeoutSeconds * 1000,
+        });
+    }, [tools, settings.remoteToolTimeoutSeconds]);
 
     useEffect(() => {
         return registerSelectionQuoteRuntimeListener({
@@ -488,6 +503,20 @@ const ChatWidget = () => {
         });
         abortControllerRef.current = null;
     };
+
+    handleSendRef.current = handleSend;
+    handlePromptShortcutRef.current = handlePromptShortcut;
+
+    useEffect(() => {
+        return registerPageShortcutRuntimeListener({
+            onMessage: (text) => {
+                void handleSendRef.current(text);
+            },
+            onOpenPanel: () => {
+                setPanelOpen(true);
+            },
+        });
+    }, []);
 
     // --- Quick Actions ---
     const totalCapabilities = tools.length + prompts.length + resources.length;

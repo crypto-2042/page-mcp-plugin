@@ -279,6 +279,49 @@ host.start();
 
 Once the host is started, the Page MCP extension will automatically discover and connect to it.
 
+### Reserved `init` Tool Convention
+
+Page MCP Plugin also supports a private reserved tool named `init`.
+
+- A tool named `init` is not exposed to the AI tool catalog.
+- After capability discovery finishes, the plugin selects the best path-matching `init` tool for the current page and runs it silently once per `origin + pathname`.
+- This is intended for page-side enhancements such as inserting buttons, wiring DOM interactions, and exposing fast entry points into the Page MCP chat UI.
+
+### Start A Chat From `init`
+
+Inside an `init` tool, dispatch a window event to open the panel and immediately send a message:
+
+```js
+window.dispatchEvent(new CustomEvent('pmcp:shortcut', {
+  detail: {
+    text: 'Please summarize the current page'
+  }
+}));
+```
+
+Example button binding:
+
+```js
+const button = document.createElement('button');
+button.textContent = 'Summarize page';
+
+button.addEventListener('click', () => {
+  window.dispatchEvent(new CustomEvent('pmcp:shortcut', {
+    detail: {
+      text: 'Please summarize the current page'
+    }
+  }));
+});
+
+document.body.appendChild(button);
+```
+
+Event contract:
+
+- Event name: `pmcp:shortcut`
+- Payload: `{ text: string }`
+- Behavior: opens the Page MCP panel and immediately starts a chat turn with that message
+
 ---
 
 ## License
