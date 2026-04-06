@@ -1,3 +1,5 @@
+import { executeRemoteToolInPage } from './remote-tool-executor.js';
+
 export type InitTool = {
     name: string;
     path?: string;
@@ -27,6 +29,7 @@ const LITERAL_METACHAR_ESCAPES = new Set([
     '}',
     '|',
     '/',
+    '-',
     '\\',
 ]);
 
@@ -87,17 +90,6 @@ function isHexDigit(char: string | undefined): boolean {
 }
 
 function countUnicodeCodePointEscape(pattern: string, index: number): { count: number; nextIndex: number } {
-    if (pattern[index + 2] === '{') {
-        const closeIndex = pattern.indexOf('}', index + 3);
-        if (closeIndex > index + 3) {
-            const codePoint = pattern.slice(index + 3, closeIndex);
-            if (/^[0-9a-fA-F]+$/.test(codePoint)) {
-                return { count: 1, nextIndex: closeIndex };
-            }
-        }
-        return { count: 0, nextIndex: index + 1 };
-    }
-
     if (
         isHexDigit(pattern[index + 2]) &&
         isHexDigit(pattern[index + 3]) &&
@@ -107,7 +99,12 @@ function countUnicodeCodePointEscape(pattern: string, index: number): { count: n
         return { count: 1, nextIndex: index + 5 };
     }
 
-    return { count: 0, nextIndex: index + 1 };
+    return { count: 1, nextIndex: index + 1 };
+}
+
+function findClosingDelimiter(pattern: string, startIndex: number, closingDelimiter: string): number | null {
+    const closeIndex = pattern.indexOf(closingDelimiter, startIndex);
+    return closeIndex === -1 ? null : closeIndex;
 }
 
 function countEscapedLiteral(pattern: string, index: number): { count: number; nextIndex: number } {
@@ -121,22 +118,37 @@ function countEscapedLiteral(pattern: string, index: number): { count: number; n
         return { count: 1, nextIndex: index + 1 };
     }
 
-    if (SEMANTIC_ESCAPES.has(next)) {
-        return { count: 0, nextIndex: index + 1 };
-    }
-
     if (next === 'x') {
         if (isHexDigit(pattern[index + 2]) && isHexDigit(pattern[index + 3])) {
             return { count: 1, nextIndex: index + 3 };
         }
-        return { count: 0, nextIndex: index + 1 };
+        return { count: 1, nextIndex: index + 1 };
     }
 
     if (next === 'u') {
+        if (pattern[index + 2] === '{') {
+            return { count: 1, nextIndex: index + 1 };
+        }
         return countUnicodeCodePointEscape(pattern, index);
     }
 
-    if (next === 'Q' || next === 'E') {
+    if (next === 'p' || next === 'P') {
+        if (pattern[index + 2] === '{') {
+            const closeIndex = findClosingDelimiter(pattern, index + 3, '}');
+            if (closeIndex != null) {
+                return { count: 0, nextIndex: closeIndex };
+            }
+        }
+    }
+
+    if (next === 'k' && pattern[index + 2] === '<') {
+        const closeIndex = findClosingDelimiter(pattern, index + 3, '>');
+        if (closeIndex != null) {
+            return { count: 0, nextIndex: closeIndex };
+        }
+    }
+
+    if (SEMANTIC_ESCAPES.has(next)) {
         return { count: 0, nextIndex: index + 1 };
     }
 
@@ -147,7 +159,47 @@ function countEscapedLiteral(pattern: string, index: number): { count: number; n
     return { count: 0, nextIndex: index + 1 };
 }
 
-function countLiteralChars(pattern: string): number {
+function findClosingParenIndex(pattern: string, startIndex: number): number | null {
+    let depth = 0;
+    let inCharacterClass = false;
+
+    for (let i = startIndex; i < pattern.length; i += 1) {
+        const char = pattern[i];
+
+        if (char === '\\') {
+            i += 1;
+            continue;
+        }
+
+        if (inCharacterClass) {
+            if (char === ']') {
+                inCharacterClass = false;
+            }
+            continue;
+        }
+
+        if (char === '[') {
+            inCharacterClass = true;
+            continue;
+        }
+
+        if (char === '(') {
+            depth += 1;
+            continue;
+        }
+
+        if (char === ')') {
+            if (depth === 0) {
+                return i;
+            }
+            depth -= 1;
+        }
+    }
+
+    return null;
+}
+
+export function countInitToolLiteralChars(pattern: string): number {
     let count = 0;
     let inCharacterClass = false;
     let characterClassPosition = 0;
@@ -178,6 +230,9 @@ function countLiteralChars(pattern: string): number {
             }
 
             if (char === '-') {
+                if (characterClassPosition === 0 || pattern[i + 1] === ']') {
+                    count += 1;
+                }
                 characterClassPosition += 1;
                 continue;
             }
@@ -197,7 +252,15 @@ function countLiteralChars(pattern: string): number {
             if (pattern[i + 1] === '?') {
                 const marker = pattern[i + 2];
 
-                if (marker === ':' || marker === '=' || marker === '!') {
+                if (marker === '=' || marker === '!') {
+                    const closeIndex = findClosingParenIndex(pattern, i + 3);
+                    if (closeIndex != null) {
+                        i = closeIndex;
+                        continue;
+                    }
+                }
+
+                if (marker === ':') {
                     i += 2;
                     continue;
                 }
@@ -205,8 +268,11 @@ function countLiteralChars(pattern: string): number {
                 if (marker === '<') {
                     const lookbehindMarker = pattern[i + 3];
                     if (lookbehindMarker === '=' || lookbehindMarker === '!') {
-                        i += 3;
-                        continue;
+                        const closeIndex = findClosingParenIndex(pattern, i + 4);
+                        if (closeIndex != null) {
+                            i = closeIndex;
+                            continue;
+                        }
                     }
 
                     const groupNameCloseIndex = pattern.indexOf('>', i + 3);
@@ -249,7 +315,7 @@ function countLiteralChars(pattern: string): number {
             }
         }
 
-        if (!'^$.*+?()[]{}|'.includes(char)) {
+        if (!'^$.*+?()[]|'.includes(char)) {
             count += 1;
         }
     }
@@ -262,7 +328,7 @@ function rankInitTool(tool: InitTool, order: number, pathname: string): RankedIn
         return null;
     }
 
-    if (typeof tool.path !== 'string') {
+    if (typeof tool.path !== 'string' || tool.path.length === 0) {
         return {
             tool,
             explicitPath: false,
@@ -281,7 +347,7 @@ function rankInitTool(tool: InitTool, order: number, pathname: string): RankedIn
             tool,
             explicitPath: true,
             pathLength: tool.path.length,
-            literalCount: countLiteralChars(tool.path),
+            literalCount: countInitToolLiteralChars(tool.path),
             order,
         };
     } catch (error) {
@@ -331,4 +397,25 @@ export function pickBestInitTool(params: {
     }
 
     return best?.tool;
+}
+
+export async function runInitTool(params: {
+    tool: InitTool | null;
+    timeoutMs: number;
+}): Promise<void> {
+    const tool = params.tool;
+    if (!tool || (tool as { sourceType?: unknown }).sourceType !== 'remote') {
+        return;
+    }
+
+    const executeStr = (tool as { execute?: unknown }).execute;
+    if (typeof executeStr !== 'string' || !executeStr.trim()) {
+        return;
+    }
+
+    try {
+        await executeRemoteToolInPage(executeStr, {}, params.timeoutMs);
+    } catch (error) {
+        console.warn('[init-tool]', error);
+    }
 }
