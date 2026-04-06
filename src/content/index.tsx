@@ -16,6 +16,7 @@ import { buildExecutionCatalog, type ExecutableTool } from './execution-catalog.
 import { createInitRunState, maybeRunInitForPage, type InitTool } from './init-tool.js';
 import { buildAttachedResourceMessages, readLocalResource } from './mcp-resources.js';
 import { applyPromptShortcutMessages } from './mcp-prompt-shortcuts.js';
+import { registerPageShortcutRuntimeListener } from './page-shortcut-runtime.js';
 import {
     getInitialAttachedResourceUris,
     getSelectedResourceCountLabel,
@@ -137,6 +138,8 @@ const ChatWidget = () => {
     const qaHovered = useRef(false);
     const abortControllerRef = useRef<AbortController | null>(null);
     const initRunStateRef = useRef(createInitRunState());
+    const handleSendRef = useRef<(text?: string) => Promise<void>>(async () => {});
+    const handlePromptShortcutRef = useRef<(name: string) => Promise<void>>(async () => {});
     const [pendingToolConfirm, setPendingToolConfirm] = useState<PendingToolConfirm | null>(null);
 
     const handleStop = () => {
@@ -500,6 +503,20 @@ const ChatWidget = () => {
         });
         abortControllerRef.current = null;
     };
+
+    handleSendRef.current = handleSend;
+    handlePromptShortcutRef.current = handlePromptShortcut;
+
+    useEffect(() => {
+        return registerPageShortcutRuntimeListener({
+            onMessage: (text) => {
+                void handleSendRef.current(text);
+            },
+            onOpenPanel: () => {
+                setPanelOpen(true);
+            },
+        });
+    }, []);
 
     // --- Quick Actions ---
     const totalCapabilities = tools.length + prompts.length + resources.length;

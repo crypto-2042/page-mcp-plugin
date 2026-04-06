@@ -279,6 +279,49 @@ host.start();
 
 主机启动后，Page MCP 扩展会自动发现并连接到它。
 
+### 保留的 `init` 工具约定
+
+Page MCP Plugin 还支持一个私有保留工具名 `init`。
+
+- 名称为 `init` 的工具不会暴露给 AI 工具目录。
+- 在页面能力发现完成后，插件会为当前页面选择 path 匹配最精确的 `init` 工具，并按 `origin + pathname` 静默执行一次。
+- 这个约定适合做页面侧增强，例如插入按钮、绑定 DOM 交互、或者给 Page MCP 聊天面板提供快速入口。
+
+### 在 `init` 中直接发起会话
+
+在 `init` 工具里，可以通过派发一个 window 事件来打开面板并立即发送消息：
+
+```js
+window.dispatchEvent(new CustomEvent('pmcp:shortcut', {
+  detail: {
+    text: '请总结当前页面'
+  }
+}));
+```
+
+按钮绑定示例：
+
+```js
+const button = document.createElement('button');
+button.textContent = '总结页面';
+
+button.addEventListener('click', () => {
+  window.dispatchEvent(new CustomEvent('pmcp:shortcut', {
+    detail: {
+      text: '请总结当前页面'
+    }
+  }));
+});
+
+document.body.appendChild(button);
+```
+
+事件约定：
+
+- 事件名：`pmcp:shortcut`
+- 载荷：`{ text: string }`
+- 行为：自动打开 Page MCP 面板，并立即以这条消息发起一个聊天回合
+
 ---
 
 ## 许可证
