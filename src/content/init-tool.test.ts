@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { InitTool } from './init-tool.js';
-import { countInitToolLiteralChars, pickBestInitTool, runInitTool } from './init-tool.js';
+import { countInitToolLiteralChars, createInitRunState, maybeRunInitForPage, pickBestInitTool, runInitTool } from './init-tool.js';
 
 vi.mock('./remote-tool-executor.js', () => ({
     executeRemoteToolInPage: vi.fn(),
@@ -48,6 +48,82 @@ describe('runInitTool', () => {
         })).resolves.toBeUndefined();
 
         expect(warn).toHaveBeenCalledWith('[init-tool]', expect.any(Error));
+    });
+});
+
+describe('maybeRunInitForPage', () => {
+    it('runs the selected init tool only once per page key', async () => {
+        const state = createInitRunState();
+        const runTool = vi.fn(async () => undefined);
+        const tools: InitTool[] = [
+            { name: 'init', path: '^/docs$', sourceType: 'remote', execute: '() => true' } as InitTool,
+        ];
+
+        await maybeRunInitForPage({
+            state,
+            pageKey: 'https://example.com/docs',
+            pathname: '/docs',
+            tools,
+            timeoutMs: 3000,
+            runTool,
+        });
+
+        await maybeRunInitForPage({
+            state,
+            pageKey: 'https://example.com/docs',
+            pathname: '/docs',
+            tools,
+            timeoutMs: 3000,
+            runTool,
+        });
+
+        expect(runTool).toHaveBeenCalledTimes(1);
+        expect(state.executedPageKeys.has('https://example.com/docs')).toBe(true);
+    });
+
+    it('runs again when the page key changes', async () => {
+        const state = createInitRunState();
+        const runTool = vi.fn(async () => undefined);
+        const tools: InitTool[] = [
+            { name: 'init', path: '^/docs', sourceType: 'remote', execute: '() => true' } as InitTool,
+        ];
+
+        await maybeRunInitForPage({
+            state,
+            pageKey: 'https://example.com/docs',
+            pathname: '/docs',
+            tools,
+            timeoutMs: 3000,
+            runTool,
+        });
+
+        await maybeRunInitForPage({
+            state,
+            pageKey: 'https://example.com/docs/next',
+            pathname: '/docs/next',
+            tools,
+            timeoutMs: 3000,
+            runTool,
+        });
+
+        expect(runTool).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not mark a page key when no init tool matches', async () => {
+        const state = createInitRunState();
+        const runTool = vi.fn(async () => undefined);
+
+        await maybeRunInitForPage({
+            state,
+            pageKey: 'https://example.com/docs',
+            pathname: '/docs',
+            tools: [{ name: 'not-init', path: '^/docs$' }] as InitTool[],
+            timeoutMs: 3000,
+            runTool,
+        });
+
+        expect(runTool).not.toHaveBeenCalled();
+        expect(state.executedPageKeys.has('https://example.com/docs')).toBe(false);
     });
 });
 

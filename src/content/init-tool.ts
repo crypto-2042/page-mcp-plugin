@@ -6,6 +6,10 @@ export type InitTool = {
     [key: string]: unknown;
 };
 
+type InitRunState = {
+    executedPageKeys: Set<string>;
+};
+
 type RankedInitTool = {
     tool: InitTool;
     explicitPath: boolean;
@@ -418,4 +422,39 @@ export async function runInitTool(params: {
     } catch (error) {
         console.warn('[init-tool]', error);
     }
+}
+
+export function createInitRunState(): InitRunState {
+    return {
+        executedPageKeys: new Set<string>(),
+    };
+}
+
+export async function maybeRunInitForPage(params: {
+    state: InitRunState;
+    pageKey: string;
+    pathname: string;
+    tools: InitTool[];
+    timeoutMs: number;
+    runTool?: typeof runInitTool;
+}): Promise<void> {
+    if (params.state.executedPageKeys.has(params.pageKey)) {
+        return;
+    }
+
+    const selectedTool = pickBestInitTool({
+        pathname: params.pathname,
+        tools: params.tools,
+    });
+
+    if (!selectedTool) {
+        return;
+    }
+
+    params.state.executedPageKeys.add(params.pageKey);
+    const runTool = params.runTool ?? runInitTool;
+    await runTool({
+        tool: selectedTool,
+        timeoutMs: params.timeoutMs,
+    });
 }
