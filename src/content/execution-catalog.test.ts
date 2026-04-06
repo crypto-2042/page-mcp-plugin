@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildExecutionCatalog } from './execution-catalog.js';
 
 // Mock the remote-tool-executor module
@@ -9,6 +9,10 @@ vi.mock('./remote-tool-executor.js', () => ({
 import { executeRemoteToolInPage } from './remote-tool-executor.js';
 
 describe('buildExecutionCatalog', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
     it('registers a built-in current time tool even without page tools', async () => {
         const catalog = buildExecutionCatalog({
             mcpClient: null,
@@ -31,6 +35,33 @@ describe('buildExecutionCatalog', () => {
                 today: expect.any(String),
             }),
         }));
+    });
+
+    it('filters reserved init tools but keeps normal tools in the catalog', () => {
+        const catalog = buildExecutionCatalog({
+            mcpClient: { callTool: vi.fn() } as any,
+            tools: [
+                { name: 'init', description: 'Reserved init tool', sourceType: 'native', sourceLabel: 'native' },
+                { name: 'normal-tool', description: 'Normal tool', sourceType: 'native', sourceLabel: 'native' },
+            ] as any,
+        });
+
+        expect(catalog.map((item) => item.displayName)).not.toContain('init');
+        expect(catalog.map((item) => item.displayName)).toContain('normal-tool');
+        expect(catalog.map((item) => item.displayName)).toContain('get_current_time');
+    });
+
+    it('falls back to a valid OpenAI name for tools with only invalid characters', () => {
+        const catalog = buildExecutionCatalog({
+            mcpClient: { callTool: vi.fn() } as any,
+            tools: [
+                { name: '', description: 'Invalid name tool', sourceType: 'native', sourceLabel: 'native' },
+            ] as any,
+        });
+
+        const tool = catalog.find((item) => item.description === 'Invalid name tool');
+        expect(tool?.openAiName).toMatch(/^[a-zA-Z0-9_-]+$/);
+        expect(tool?.openAiName).not.toBe('');
     });
 
     it('executes native tools via mcpClient.callTool', async () => {
@@ -241,7 +272,7 @@ describe('buildExecutionCatalog', () => {
         expect(catalog[1]?.openAiName).toBe('get_current_time_2');
     });
 
-    it('returns empty catalog for native tools when mcpClient is null', () => {
+    it('returns the built-in current time entry when mcpClient is null', () => {
         const catalog = buildExecutionCatalog({
             mcpClient: null,
             tools: [
@@ -250,5 +281,69 @@ describe('buildExecutionCatalog', () => {
         });
         expect(catalog).toHaveLength(1);
         expect(catalog[0].displayName).toBe('get_current_time');
+    });
+
+    it('falls back to the default parameters schema for malformed inputSchema values', () => {
+        const catalog = buildExecutionCatalog({
+            mcpClient: { callTool: vi.fn() } as any,
+            tools: [
+                {
+                    name: 'broken-schema-tool',
+                    description: 'Broken schema tool',
+                    sourceType: 'native',
+                    sourceLabel: 'native',
+                    inputSchema: [],
+                },
+            ] as any,
+        });
+
+        const tool = catalog.find((item) => item.displayName === 'broken-schema-tool');
+        expect(tool?.parameters).toEqual({ type: 'object', properties: {} });
+    });
+
+    it('falls back to the default parameters schema for non-object input schemas', () => {
+        const catalog = buildExecutionCatalog({
+            mcpClient: { callTool: vi.fn() } as any,
+            tools: [
+                {
+                    name: 'string-schema-tool',
+                    description: 'String schema tool',
+                    sourceType: 'native',
+                    sourceLabel: 'native',
+                    inputSchema: { type: 'string' },
+                },
+            ] as any,
+        });
+
+        const tool = catalog.find((item) => item.displayName === 'string-schema-tool');
+        expect(tool?.parameters).toEqual({ type: 'object', properties: {} });
+    });
+
+    it('uses manifest.inputSchema when top-level inputSchema is absent', () => {
+        const manifestSchema = {
+            type: 'object',
+            properties: {
+                query: { type: 'string' },
+            },
+            required: ['query'],
+        };
+
+        const catalog = buildExecutionCatalog({
+            mcpClient: { callTool: vi.fn() } as any,
+            tools: [
+                {
+                    name: 'manifest-schema-tool',
+                    description: 'Manifest schema tool',
+                    sourceType: 'native',
+                    sourceLabel: 'native',
+                    manifest: {
+                        inputSchema: manifestSchema,
+                    },
+                },
+            ] as any,
+        });
+
+        const tool = catalog.find((item) => item.displayName === 'manifest-schema-tool');
+        expect(tool?.parameters).toEqual(manifestSchema);
     });
 });
