@@ -35,7 +35,7 @@ import { createMcpChatRuntime } from './mcp-chat-runtime.js';
 import { runChatAction } from './mcp-chat-actions.js';
 import { safeRuntimeMessage } from './safe-runtime.js';
 import { buildStreamRequestPayload } from './chat-stream.js';
-import { stopChatInputEventPropagation } from './chat-input-events.js';
+import { handleChatInputKeyDownCapture, stopChatInputEventPropagation } from './chat-input-events.js';
 import {
     SelectionQuoteArea,
     clearSelectionQuoteConversation,
@@ -780,17 +780,12 @@ const ChatWidget = () => {
                                 className="pmcp-input"
                                 value={inputText}
                                 onChange={e => setInputText(e.target.value)}
-                                onKeyDownCapture={stopChatInputEventPropagation}
-                                onKeyDown={e => {
-                                    if (e.key === 'Enter' && !e.shiftKey) {
-                                        e.preventDefault();
-                                        handleSend();
-                                    }
+                                onKeyDownCapture={e => {
+                                    const currentText = e.currentTarget.value;
+                                    handleChatInputKeyDownCapture(e, () => { void handleSend(currentText); });
                                 }}
                                 onKeyPressCapture={stopChatInputEventPropagation}
                                 onKeyUpCapture={stopChatInputEventPropagation}
-                                onBeforeInputCapture={stopChatInputEventPropagation as any}
-                                onInputCapture={stopChatInputEventPropagation as any}
                                 placeholder={t('typeMessage') || 'Type a message...'}
                                 disabled={isLoading}
                             />
