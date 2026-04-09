@@ -1,6 +1,6 @@
 {
     "name": "page-mcp-plugin",
-    "version": "1.2.2",
+    "version": "1.2.3",
     "private": true,
     "description": "Chrome extension — AI assistant that discovers page MCP tools",
     "type": "module",
